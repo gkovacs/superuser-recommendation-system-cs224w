@@ -54,6 +54,9 @@ tags = questions[['Id','OwnerId','Tags']]
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 # http://stackoverflow.com/questions/18927238/how-to-split-a-pandas-dataframe-into-many-columns-after-groupby
 tagCounts = tags.groupby('Tags').count()
+totalNumTags = sum(tagCounts['Id'])
+tagPriors = pd.DataFrame(data=tagCounts['Id'], dtype='double')
+tagPriors = tagPriors/totalNumTags
 
 
 print 'Loading Answers Dataframe'
