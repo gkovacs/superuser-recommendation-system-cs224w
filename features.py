@@ -34,9 +34,13 @@ users = pd_sql.read_frame("Select Id, Reputation, CreationDate From Users", con)
 # - Score (int64) - sum of up/downvotes that this question has received
 # - FavoriteCount (int64) - number of users who have selected this as a favorite question?
 # - Title (string) - only seems to be available for questions
-# - Tags (string) - only seems to be available for questions
+# - Tags (series of string) - list/series of tag strings
 questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
+# Replace u'<windows><disk-space><winsxs>' with pandas series [u'windows', u'disk-space', u'winsxs']
+questions['Tags'] = pd.Series(map(lambda tags: tags.strip("<>").split("><"), questions['Tags']))
 
+# Group by tag to determine relative frequencies
+# http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 
 # Answers = 
 # - id
@@ -45,4 +49,9 @@ questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUse
 # - creationdate (datetime) = iso timestamp of when answer was created
 # - score (int64) - sum of up/downvotes that this answer has received
 answers = pd_sql.read_frame("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2", con)
+
+
+# Build up UserToTag and PostToTag mappings, since that isn't included in data dump
+# This doesn't work since stackoverflow tags don't have closing slash; I hate xml...
+# ElementTree.fromstring(tags)
 
