@@ -11,6 +11,7 @@
 
 import pandas as pd
 import pandas.io.sql as pd_sql
+from scipy import sparse
 import sqlite3 as sql
 
 # Connect to database, load query into dataframe
@@ -59,9 +60,39 @@ totalNumTags = sum(tagCounts['Id'])
 tagPriors = pd.DataFrame(data=tagCounts['Id'], dtype='double')
 tagPriors = tagPriors/totalNumTags
 
-# TODO: Compute vector of tag weights for each tag in question
-questions['Tags'] = tuple(map(lambda tags: tags.strip("<>").split("><"), questions['Tags']))
-# questions['Tags'] = tuple((tag, tagPriors.loc[tag]) for tag in questions['Tags'])
+
+print 'Grouping Tags by Question'
+# Compute vector of tag weights for each tag in question
+# m x n matrix where m=num rows, n=num available tags
+# row index corresponds to Id from questions
+# column index corresponds to tag from tagCounts
+# each entry in matrix is probability tag appears in question
+
+# This results in MemoryError, need sparse matrix representation...
+# questionsToTags = tags.pivot(index='Id', columns='Tags')
+# questionsToTags = pd.SparseDataFrame???
+
+# sparse.csr_matrix = Compressed Sparse Row matrix: column indices
+# for row i are stored in indices[indptr[i]:indptr[i+1]] and their
+# corresponding values are stored in data[indptr[i]:indptr[i+1]]. 
+
+questionRows = []
+for index, question in questions.iterrows():
+  # convert xml tags to list
+  relevantTags = question['Tags'].strip("<>").split("><")
+  question['Tags'] = relevantTags
+  # keep probabilities only for the available tags
+  tagVector = tagPriors.where(tagPriors.ix[relevantTags]).ix[:,0]
+  questionRows.append(tagVector.to_sparse(kind='integer'))
+  
+import ipdb
+ipdb.set_trace()
+print 'Building sparse questionsToTags matrix'
+questionsToTags = sparse.csr_matrix(questionRows)
+
+
+print 'Grouping Tags by User'
+
 
 print 'Loading Answers Dataframe'
 # Answers = 
