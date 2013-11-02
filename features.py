@@ -37,11 +37,14 @@ users = pd_sql.read_frame("Select Id, Reputation, CreationDate From Users", con)
 # - Tags (series of string) - list/series of tag strings
 questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
 # Replace u'<windows><disk-space><winsxs>' with pandas series [u'windows', u'disk-space', u'winsxs']
-questions['Tags'] = tuple(map(lambda tags: tags.strip("<>").split("><"), questions['Tags']))
+tagsColumn = questions['Tags'].apply(lambda tags: pd.Series(tags.strip("<>").split("><"))).stack()
+# Reduce dimensionality of tags column: convert from column containing tuples to column with single words
+# http://stackoverflow.com/questions/17116814/pandas-how-do-i-split-text-in-a-column-into-multiple-columns
+tagsColumn.index = tagsColumn.index.droplevel(-1)
+tagsColumn.name = 'Tags'
+del questions['Tags']
+questions = questions.join(tagsColumn)
 
-# Note: this is slow... and still need to group by individual tags, not tuples of tags
-print 'Grouping by tag, this might take a few minutes...'
-tagCounts = questions.groupby('Tags').count()
 
 # Group by tag to determine relative frequencies
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
