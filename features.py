@@ -19,6 +19,7 @@ con = sql.connect(DB_NAME)
 
 # Load features as dataframes
 
+print 'Loading Users Dataframe'
 # Users = contributors to stackoverflow
 # - Id 
 # - Reputation (int64) = total points received for participating in the community
@@ -26,6 +27,7 @@ con = sql.connect(DB_NAME)
 users = pd_sql.read_frame("Select Id, Reputation, CreationDate From Users", con)
 
 
+print 'Loading Questions Dataframe'
 # Questions = 
 # - Id
 # - AcceptedId (id) = id of the answer that was accepted by the creator of this question (post.acceptedanswerid)
@@ -46,10 +48,15 @@ del questions['Tags']
 questions = questions.join(tagsColumn)
 
 
+print 'Grouping Questions by Tag'
+tags = questions[['Id','OwnerId','Tags']]
 # Group by tag to determine relative frequencies
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 # http://stackoverflow.com/questions/18927238/how-to-split-a-pandas-dataframe-into-many-columns-after-groupby
+tagCounts = tags.groupby('Tags').count()
 
+
+print 'Loading Answers Dataframe'
 # Answers = 
 # - id
 # - questionid (id) = id of the question this answer is attached to (post.parentid)
