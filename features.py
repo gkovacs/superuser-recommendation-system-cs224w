@@ -38,18 +38,19 @@ print 'Loading Questions Dataframe'
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
 questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
+
+tags = questions[['Id', 'OwnerId', 'Tags']]
 # Replace u'<windows><disk-space><winsxs>' with pandas series [u'windows', u'disk-space', u'winsxs']
-tagsColumn = questions['Tags'].apply(lambda tags: pd.Series(tags.strip("<>").split("><"))).stack()
+tagsColumn = tags['Tags'].apply(lambda tagString: pd.Series(tagString.strip("<>").split("><"))).stack()
 # Reduce dimensionality of tags column: convert from column containing tuples to column with single words
 # http://stackoverflow.com/questions/17116814/pandas-how-do-i-split-text-in-a-column-into-multiple-columns
 tagsColumn.index = tagsColumn.index.droplevel(-1)
 tagsColumn.name = 'Tags'
-del questions['Tags']
-questions = questions.join(tagsColumn)
+del tags['Tags']
+tags = tags.join(tagsColumn)
 
 
 print 'Grouping Questions by Tag'
-tags = questions[['Id','OwnerId','Tags']]
 # Group by tag to determine relative frequencies
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 # http://stackoverflow.com/questions/18927238/how-to-split-a-pandas-dataframe-into-many-columns-after-groupby
@@ -58,6 +59,9 @@ totalNumTags = sum(tagCounts['Id'])
 tagPriors = pd.DataFrame(data=tagCounts['Id'], dtype='double')
 tagPriors = tagPriors/totalNumTags
 
+# TODO: Compute vector of tag weights for each tag in question
+questions['Tags'] = tuple(map(lambda tags: tags.strip("<>").split("><"), questions['Tags']))
+# questions['Tags'] = tuple((tag, tagPriors.loc[tag]) for tag in questions['Tags'])
 
 print 'Loading Answers Dataframe'
 # Answers = 
