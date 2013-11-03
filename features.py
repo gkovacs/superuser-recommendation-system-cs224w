@@ -86,8 +86,8 @@ print 'Grouping Tags by Question'
 
 #@profile
 def getQuestionsToTags():
-  keywordIndexes = pd.Series()
-  keywordProbabilities = pd.Series()
+  keywordIndexes = list()
+  keywordProbabilities = list()
   questionIndexes = list()
   questionIndex=0
   # iterrows is really slow... https://groups.google.com/forum/#!topic/pystatsmodels/cfQOcrtOPlA
@@ -96,17 +96,17 @@ def getQuestionsToTags():
     relevantTags = questionTags.strip("<>").split("><")
     questionTags = relevantTags
     # keep probabilities only for the available tags
-    tagVector = tagPriors.loc[relevantTags]
-    keywordProbabilities=keywordProbabilities.append(tagVector['Probability'])
-    keywordIndexes=keywordIndexes.append(tagVector['Index'])
-    questionIndexes=itertools.chain(questionIndexes, [questionIndex]*len(tagVector))
+    for tag in relevantTags:
+      (probability,index)=tagPriors.loc[tag]
+      #keywordProbabilities.append(np.asscalar(probability))
+      keywordProbabilities.append(probability)
+      keywordIndexes.append(int(index))
+      questionIndexes.append(questionIndex)
     if questionIndex%10000 == 0:
       print questionIndex
     questionIndex+=1
 
-    
-  print 'Building sparse questionsToTags matrix'
-  indexes = np.vstack((np.array(list(questionIndexes)), keywordIndexes.values))
+  indexes = np.array((questionIndexes, keywordIndexes))
   return sparse.csr_matrix((keywordProbabilities, indexes), shape=(len(questions), len(tagPriors)))
 
 questionsToTags = getQuestionsToTags()
