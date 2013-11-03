@@ -15,6 +15,8 @@ import numpy as np
 from scipy import sparse
 import sqlite3 as sql
 
+import itertools
+
 # Connect to database, load query into dataframe
 DB_NAME="superuser.sqlite3"
 con = sql.connect(DB_NAME)
@@ -87,21 +89,24 @@ def getQuestionsToTags():
   keywordIndexes = pd.Series()
   keywordProbabilities = pd.Series()
   questionIndexes = list()
-  for questionIndex, question in questions.iterrows():
+  questionIndex=0
+  # iterrows is really slow... https://groups.google.com/forum/#!topic/pystatsmodels/cfQOcrtOPlA
+  for questionTags in questions['Tags']:
     # convert xml tags to list
-    relevantTags = question['Tags'].strip("<>").split("><")
-    question['Tags'] = relevantTags
+    relevantTags = questionTags.strip("<>").split("><")
+    questionTags = relevantTags
     # keep probabilities only for the available tags
     tagVector = tagPriors.loc[relevantTags]
     keywordProbabilities=keywordProbabilities.append(tagVector['Probability'])
     keywordIndexes=keywordIndexes.append(tagVector['Index'])
-    questionIndexes=questionIndexes + [questionIndex]*len(tagVector)
+    questionIndexes=itertools.chain(questionIndexes, [questionIndex]*len(tagVector))
     if questionIndex%10000 == 0:
       print questionIndex
+    questionIndex+=1
 
     
   print 'Building sparse questionsToTags matrix'
-  indexes = np.vstack((np.array(questionIndexes), keywordIndexes.values))
+  indexes = np.vstack((np.array(list(questionIndexes)), keywordIndexes.values))
   return sparse.csr_matrix((keywordProbabilities, indexes), shape=(len(questions), len(tagPriors)))
 
 questionsToTags = getQuestionsToTags()
