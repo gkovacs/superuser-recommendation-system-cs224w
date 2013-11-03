@@ -11,6 +11,7 @@
 
 import pandas as pd
 import pandas.io.sql as pd_sql
+import numpy as np
 from scipy import sparse
 import sqlite3 as sql
 
@@ -56,9 +57,13 @@ print 'Grouping Questions by Tag'
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 # http://stackoverflow.com/questions/18927238/how-to-split-a-pandas-dataframe-into-many-columns-after-groupby
 tagCounts = tags.groupby('Tags').count()
-totalNumTags = sum(tagCounts['Id'])
-tagPriors = pd.DataFrame(data=tagCounts['Id'], dtype='double')
+totalNumTags = float(sum(tagCounts['Id']))
+tagPriors = pd.DataFrame(data=tagCounts['Id'], columns=['Probability'])
 tagPriors = tagPriors/totalNumTags
+tagPriors['Index'] = np.arange(0, len(tagPriors))
+
+# Array of tag index to probability which can be used in computations
+tagPriorsArray = tagPriors['Probability'].values[0]
 
 
 print 'Grouping Tags by Question'
@@ -70,28 +75,38 @@ print 'Grouping Tags by Question'
 
 # This results in MemoryError, need sparse matrix representation...
 # questionsToTags = tags.pivot(index='Id', columns='Tags')
+# Constructing sparse dataframes: https://groups.google.com/forum/#!msg/pydata/9c1vem2ksPQ/4F0X8nH5-HgJ
 # questionsToTags = pd.SparseDataFrame???
 
 # sparse.csr_matrix = Compressed Sparse Row matrix: column indices
 # for row i are stored in indices[indptr[i]:indptr[i+1]] and their
 # corresponding values are stored in data[indptr[i]:indptr[i+1]]. 
 
-questionRows = []
-for index, question in questions.iterrows():
-  # convert xml tags to list
-  relevantTags = question['Tags'].strip("<>").split("><")
-  question['Tags'] = relevantTags
-  # keep probabilities only for the available tags
-  tagVector = tagPriors.where(tagPriors.ix[relevantTags]).ix[:,0]
-  questionRows.append(tagVector.to_sparse(kind='integer'))
-  
-import ipdb
-ipdb.set_trace()
-print 'Building sparse questionsToTags matrix'
-questionsToTags = sparse.csr_matrix(questionRows)
+#@profile
+def getQuestionsToTags():
+  keywordIndexes = pd.Series()
+  keywordProbabilities = pd.Series()
+  questionIndexes = list()
+  for questionIndex, question in questions.iterrows():
+    # convert xml tags to list
+    relevantTags = question['Tags'].strip("<>").split("><")
+    question['Tags'] = relevantTags
+    # keep probabilities only for the available tags
+    tagVector = tagPriors.loc[relevantTags]
+    keywordProbabilities=keywordProbabilities.append(tagVector['Probability'])
+    keywordIndexes=keywordIndexes.append(tagVector['Index'])
+    questionIndexes=questionIndexes + [questionIndex]*len(tagVector)
+    if questionIndex%10000 == 0:
+      print questionIndex
 
+    
+  print 'Building sparse questionsToTags matrix'
+  indexes = np.vstack((np.array(questionIndexes), keywordIndexes.values))
+  return sparse.csr_matrix((keywordProbabilities, indexes), shape=(len(questions), len(tagPriors)))
 
-print 'Grouping Tags by User'
+questionsToTags = getQuestionsToTags()
+
+print 'Grouping Tags by User - TODO'
 
 
 print 'Loading Answers Dataframe'
