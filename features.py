@@ -43,6 +43,11 @@ print 'Loading Questions Dataframe'
 # - Tags (series of string) - list/series of tag strings
 questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
 
+# Tags is DataFrame containing:
+# - Id = id of question this tag is associated with
+# - OwnerId = id of user who asked question containing this tag
+# - Tag - string representation of the tag.
+# Note that a specific Tag can appear in multiple questions, but (Id, Tag) pairs are unique.
 tags = questions[['Id', 'OwnerId', 'Tags']]
 # Replace u'<windows><disk-space><winsxs>' with pandas series [u'windows', u'disk-space', u'winsxs']
 tagsColumn = tags['Tags'].apply(lambda tagString: pd.Series(tagString.strip("<>").split("><"))).stack()
@@ -58,9 +63,14 @@ print 'Grouping Questions by Tag'
 # Group by tag to determine relative frequencies
 # http://stackoverflow.com/questions/10373660/converting-a-pandas-groupby-object-to-dataframe
 # http://stackoverflow.com/questions/18927238/how-to-split-a-pandas-dataframe-into-many-columns-after-groupby
+# TagCounts is a DataFrame containing:
+# - NumQuestions = number of questions labelled with this tag
+# - NumAskers = number of users who asked a question containing this tag
 tagCounts = tags.groupby('Tags').count()
-totalNumTags = float(sum(tagCounts['Id']))
-tagPriors = pd.DataFrame(data=tagCounts['Id'], columns=['Probability'])
+tagCounts = tagCounts.rename(columns={'Id':'NumQuestions', 'OwnerId':'NumAskers'})
+del tagCounts['Tags']
+totalNumTags = float(sum(tagCounts['NumQuestions']))
+tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'])
 tagPriors = tagPriors/totalNumTags
 tagPriors['Index'] = np.arange(0, len(tagPriors))
 
@@ -71,13 +81,11 @@ tagPriorsArray = tagPriors['Probability'].values[0]
 print 'Grouping Tags by Question'
 # Compute vector of tag weights for each tag in question
 # m x n matrix where m=num rows, n=num available tags
-# row index corresponds to Id from questions
+# row index corresponds to index of the question
 # column index corresponds to tag from tagCounts
-# each entry in matrix is probability tag appears in question
+# each entry in matrix is probability that tag appears in question
 
 # This results in MemoryError, need sparse matrix representation...
-# questionsToTags = tags.pivot(index='Id', columns='Tags')
-# Constructing sparse dataframes: https://groups.google.com/forum/#!msg/pydata/9c1vem2ksPQ/4F0X8nH5-HgJ
 # questionsToTags = pd.SparseDataFrame???
 
 # sparse.csr_matrix = Compressed Sparse Row matrix: column indices
@@ -98,7 +106,6 @@ def getQuestionsToTags():
     # keep probabilities only for the available tags
     for tag in relevantTags:
       (probability,index)=tagPriors.loc[tag]
-      #keywordProbabilities.append(np.asscalar(probability))
       keywordProbabilities.append(probability)
       keywordIndexes.append(int(index))
       questionIndexes.append(questionIndex)
