@@ -41,14 +41,14 @@ print 'Loading Questions Dataframe'
 # - FavoriteCount (int64) - number of users who have selected this as a favorite question?
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
-questions = pd_sql.read_frame("Select Id, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
+questions = pd_sql.read_frame("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
 
 # Tags is DataFrame containing:
 # - Id = id of question this tag is associated with
 # - OwnerId = id of user who asked question containing this tag
 # - Tag - string representation of the tag.
 # Note that a specific Tag can appear in multiple questions, but (Id, Tag) pairs are unique.
-tags = questions[['Id', 'OwnerId', 'Tags']]
+tags = questions[['QuestionId', 'OwnerId', 'Tags']]
 # Replace u'<windows><disk-space><winsxs>' with pandas series [u'windows', u'disk-space', u'winsxs']
 tagsColumn = tags['Tags'].apply(lambda tagString: pd.Series(tagString.strip("<>").split("><"))).stack()
 # Reduce dimensionality of tags column: convert from column containing tuples to column with single words
@@ -57,6 +57,8 @@ tagsColumn.index = tagsColumn.index.droplevel(-1)
 tagsColumn.name = 'Tags'
 del tags['Tags']
 tags = tags.join(tagsColumn)
+# tags.reset_index(drop=True) #this doesn't seem to work...
+tags.index=range(len(tags))
 
 
 print 'Grouping Questions by Tag'
@@ -67,14 +69,17 @@ print 'Grouping Questions by Tag'
 # - NumQuestions = number of questions labelled with this tag
 # - NumAskers = number of users who asked a question containing this tag
 tagCounts = tags.groupby('Tags').count()
-tagCounts = tagCounts.rename(columns={'Id':'NumQuestions', 'OwnerId':'NumAskers'})
+tagCounts = tagCounts.rename(columns={'QuestionId':'NumQuestions', 'OwnerId':'NumAskers'})
 del tagCounts['Tags']
-totalNumTags = float(sum(tagCounts['NumQuestions']))
+
+# tagPriors captures probability that a tag appears in a question
+# Computed as (num questions with this tag)/(total num questions)
+totalNumQuestions=len(questions)
 tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'])
-tagPriors = tagPriors/totalNumTags
+tagPriors = tagPriors/totalNumQuestions
 tagPriors['Index'] = np.arange(0, len(tagPriors))
 
-# Array of tag index to probability which can be used in computations
+# Array of tag index to probability tag appears in question which can be used in computations
 tagPriorsArray = tagPriors['Probability'].values[0]
 
 
@@ -83,10 +88,12 @@ print 'Grouping Tags by Question'
 # m x n matrix where m=num rows, n=num available tags
 # row index corresponds to index of the question
 # column index corresponds to tag from tagCounts
-# each entry in matrix is probability that tag appears in question
-
-# This results in MemoryError, need sparse matrix representation...
-# questionsToTags = pd.SparseDataFrame???
+# each entry in matrix is probability that tag (column) appears in
+# the question (row), computed as:
+# (tagInQuestion ? 1 : 0)*(1.0-(probability tag appears in any question))
+# NaN = tag not in question,
+# low value (near 0) = question has tag, but tag present in many other questions (ie: common tag)
+# high value (near 1) = question has tag, only present in few other questions (ie: rare tag)
 
 # sparse.csr_matrix = Compressed Sparse Row matrix: column indices
 # for row i are stored in indices[indptr[i]:indptr[i+1]] and their
@@ -106,7 +113,8 @@ def getQuestionsToTags():
     # keep probabilities only for the available tags
     for tag in relevantTags:
       (probability,index)=tagPriors.loc[tag]
-      keywordProbabilities.append(probability)
+      # Note: we are capturing how
+      keywordProbabilities.append(1.0-probability)
       keywordIndexes.append(int(index))
       questionIndexes.append(questionIndex)
     if questionIndex%10000 == 0:
@@ -118,8 +126,6 @@ def getQuestionsToTags():
 
 questionsToTags = getQuestionsToTags()
 
-print 'Grouping Tags by User - TODO'
-
 
 print 'Loading Answers Dataframe'
 # Answers = 
@@ -130,8 +136,16 @@ print 'Loading Answers Dataframe'
 # - score (int64) - sum of up/downvotes that this answer has received
 answers = pd_sql.read_frame("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2", con)
 
-
-# Build up UserToTag and PostToTag mappings, since that isn't included in data dump
-# This doesn't work since stackoverflow tags don't have closing slash; I hate xml...
-# ElementTree.fromstring(tags)
-
+print 'Grouping Tags by User'
+# Build up UserToTag mappings, since that isn't included in data dump
+def mergeAnswersTags(answersDataframe, tagsDataframe):
+  tempTags = tags[['Tags', 'QuestionId']]
+  tempAnswers = answers[['OwnerId','QuestionId']]
+  tempAnswers=tempAnswers.rename(columns={'OwnerId':'Id'})
+  # Step1: get all tags for each answer
+  answersToTags=tempAnswers.merge(tempTags, on="QuestionId")
+  # http://stackoverflow.com/questions/19530568/can-pandas-groupby-aggregate-into-a-list-rather-than-sum-mean-etc
+  # Step 2: pivot/group tags by user, get number of times user has used that tag
+  print 'Aggregating Tags by User'
+  tagsGroupedByUser = answersTags.groupby(['Id','Tags'])['QuestionId'].apply(lambda questionid: len(questionid.unique()))
+  return tagsGroupedByUser
