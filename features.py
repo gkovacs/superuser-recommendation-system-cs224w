@@ -200,3 +200,10 @@ userToTags.data /= rowSums[rowIndices]
 
 # Verify that rows sum to 1
 #np.sum(userToTags[0].todense())
+
+# Example: take dot product of 1st row of userToTags and questionsToTags
+#np.asscalar(userToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
+
+# Create giant matrix of users' affinity to questions...
+# this results in MemoryError...
+#usersToQuestions = userToTags * questionsToTags.T
