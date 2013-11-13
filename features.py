@@ -14,6 +14,7 @@ import pandas.io.sql as pd_sql
 import numpy as np
 from scipy import sparse
 import sqlite3 as sql
+import sanetime
 
 import itertools
 
@@ -23,12 +24,19 @@ con = sql.connect(DB_NAME)
 
 # Load features as dataframes
 
+# Convert CreationDate column from string into unix epoch timestamp
+# (integer seconds since 1970)
+def loadDataframe(queryString):
+  dataframe = pd_sql.read_frame(queryString, con)
+  dataframe['CreationDate'] = dataframe['CreationDate'].apply(lambda t: sanetime.time(t).seconds)
+  return dataframe
+
 print 'Loading Users Dataframe'
 # Users = contributors to stackoverflow
 # - Id 
 # - Reputation (int64) = total points received for participating in the community
 # - CreatedDate (datetime) = date when the user joined superuser.com
-users = pd_sql.read_frame("Select Id, Reputation, CreationDate From Users", con)
+users = loadDataframe("Select Id, Reputation, CreationDate From Users")
 
 
 print 'Loading Questions Dataframe'
@@ -41,7 +49,8 @@ print 'Loading Questions Dataframe'
 # - FavoriteCount (int64) - number of users who have selected this as a favorite question?
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
-questions = pd_sql.read_frame("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1", con)
+questions = loadDataframe("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1")
+
 
 # Tags is DataFrame containing:
 # - Id = id of question this tag is associated with
@@ -134,7 +143,8 @@ print 'Loading Answers Dataframe'
 # - ownerid (id) = id of the user who created the answer (-1 for wiki community answer)
 # - creationdate (datetime) = iso timestamp of when answer was created
 # - score (int64) - sum of up/downvotes that this answer has received
-answers = pd_sql.read_frame("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2", con)
+answers = loadDataframe("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2")
+
 
 print 'Grouping Tags by User'
 # Build up UserToTag mappings, since that isn't included in data dump
