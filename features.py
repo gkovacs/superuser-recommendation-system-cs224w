@@ -13,6 +13,8 @@ import pandas as pd
 import pandas.io.sql as pd_sql
 import numpy as np
 from scipy import sparse
+#from sklearn.preprocessing import normalize
+
 import sqlite3 as sql
 import sanetime
 
@@ -28,7 +30,7 @@ con = sql.connect(DB_NAME)
 # (integer seconds since 1970)
 def loadDataframe(queryString):
   dataframe = pd_sql.read_frame(queryString, con)
-  dataframe['CreationDate'] = dataframe['CreationDate'].apply(lambda t: sanetime.time(t).seconds)
+  #dataframe['CreationDate'] = dataframe['CreationDate'].apply(lambda t: sanetime.time(t).seconds)
   return dataframe
 
 print 'Loading Users Dataframe'
@@ -91,6 +93,9 @@ tagPriors['Index'] = np.arange(0, len(tagPriors))
 # Array of tag index to probability tag appears in question which can be used in computations
 tagPriorsArray = tagPriors['Probability'].values[0]
 
+# Dictionary which maps from tag to its index (for building sparse matrices)
+tagToIndex=dict(row for row in tagPriors['Index'].iteritems())
+
 
 print 'Grouping Tags by Question'
 # Compute vector of tag weights for each tag in question
@@ -122,7 +127,7 @@ def getQuestionsToTags():
     # keep probabilities only for the available tags
     for tag in relevantTags:
       (probability,index)=tagPriors.loc[tag]
-      # Note: we are capturing how
+      # Note: this feature captures how rare a tag is
       keywordProbabilities.append(1.0-probability)
       keywordIndexes.append(int(index))
       questionIndexes.append(questionIndex)
@@ -131,7 +136,7 @@ def getQuestionsToTags():
     questionIndex+=1
 
   indexes = np.array((questionIndexes, keywordIndexes))
-  return sparse.csr_matrix((keywordProbabilities, indexes), shape=(len(questions), len(tagPriors)))
+  return sparse.csr_matrix((keywordProbabilities, indexes), dtype='float64', shape=(len(questions), len(tagPriors)))
 
 questionsToTags = getQuestionsToTags()
 
@@ -157,5 +162,41 @@ def mergeAnswersTags(answersDataframe, tagsDataframe):
   # http://stackoverflow.com/questions/19530568/can-pandas-groupby-aggregate-into-a-list-rather-than-sum-mean-etc
   # Step 2: pivot/group tags by user, get number of times user has used that tag
   print 'Aggregating Tags by User'
-  tagsGroupedByUser = answersTags.groupby(['Id','Tags'])['QuestionId'].apply(lambda questionid: len(questionid.unique()))
+  tagsGroupedByUser = answersToTags.groupby(['Id','Tags'])['QuestionId'].apply(lambda questionid: len(questionid.unique()))
   return tagsGroupedByUser
+
+# Denormalized representation via multidimensional matrix;
+# each row contains: answerer userId, tag, count.
+userToTagsMultidimensional=mergeAnswersTags(answers, tags)
+
+# Sparse matrix representation: each row is a user, columns are tags
+# elements are the number of times user used that tag
+def getUserToTagsMatrix(userToTagsMultidimensional):
+  userIndex=0
+  previousUserId=1
+  tagIndexes = list()
+  userIndexes = list()
+  tagWeights = list()
+  print 'Building sparse userToTags matrix'
+  for ((userid, tag), count) in userToTagsMultidimensional.iteritems():
+    if previousUserId != userid:
+      # start new row
+      userIndex += 1
+      previousUserId=userid
+    userIndexes.append(userIndex)
+    tagIndexes.append(tagToIndex[tag])
+    tagWeights.append(count)
+  
+  # Build sparse matrix
+  indexes = np.array((userIndexes, tagIndexes))
+  return sparse.csr_matrix((tagWeights, indexes), dtype='float64', shape=(len(users), len(tagPriors)))
+
+userToTags = getUserToTagsMatrix(userToTagsMultidimensional)
+
+# Normalize userToTags sparse matrix so rows sum to 1
+rowSums = np.array(userToTags.sum(axis=1))[:,0]
+rowIndices, colIndices = userToTags.nonzero()
+userToTags.data /= rowSums[rowIndices]
+
+# Verify that rows sum to 1
+#np.sum(userToTags[0].todense())
