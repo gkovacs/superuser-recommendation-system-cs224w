@@ -218,9 +218,23 @@ usersToTags.data /= rowSums[rowIndices]
 # given the tags in that question?
 print 'Predicting users most likely to answer question'
 numTop=100
+questionIndex=0
+numHits=0
 for questionToTags in questionsToTags:
   relevantUsers = usersToTags*questionToTags.T
   #topUsers = bottleneck.argpartsort(-relevantUsers.toarray(), numTop, axis=0)
-  topUsers = np.argsort(-relevantUsers.toarray(), axis=0)[0:numTop]
+  topUserIndexes = np.argsort(-relevantUsers.toarray(), axis=0)[0:numTop]
   # Determine if user from topUsers answered the question
-  
+  topUserIds = users['Id'].ix[topUserIndexes.flatten()]
+  questionId=questions['QuestionId'].ix[questionIndex]
+  results = answers[(answers['OwnerId'].isin(topUserIds)) & (answers['QuestionId']==questionId)]
+  if len(results) > 0:
+    numHits+=1
+  if questionIndex % 10000 == 0:
+    print questionIndex
+  questionIndex+=1
+
+print 'Prediction rate:'+str(numHits/float(len(questionsToTags)))
+
+# For a given user, which questions is he most likely to answer?
+# build histogram
