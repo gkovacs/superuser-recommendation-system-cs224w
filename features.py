@@ -57,6 +57,7 @@ print 'Loading Questions Dataframe'
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
 questions = loadDataframe("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1 and Id in (Select ParentId from Posts where PostTypeId=2)")
+numQuestions = len(questions)
 
 
 # Tags is DataFrame containing:
@@ -284,20 +285,19 @@ questionsOwnersSet=set(zip(answers.QuestionId,answers.OwnerId))
 
 #@profile
 def predictQuestionsAnsweredByUser():
-  numTop=1000
   userIndex=0
-  histogram = np.zeros((numUsers, numTop), dtype='int32')
+  histogram = np.zeros(numQuestions, dtype='int32')
   for userToTags in usersToTags:
     relevantQuestions = questionsToTags*userToTags.T
-    topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
+    topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)
     topQuestions = questions.iloc[topQuestionIndexes.flatten()]
-    # TODO: build histogram
     userId = users['Id'].iloc[0]
-    for rankIndex in range(numTop):
-      questionId = topQuestions['QuestionId'].iloc[rankIndex]
+    rankIndex = 0
+    for questionId in topQuestions['QuestionId']:
       if (questionId, userId) in questionsOwnersSet:
-        histogram[userIndex,rankIndex] += 1
+        histogram[rankIndex] += 1
         break
+      rankIndex += 1
     if userIndex % 1000 == 0:
       print userIndex
     userIndex += 1
@@ -309,11 +309,11 @@ np.savez('histogram', hitHistogram)
 
 def plotHistogram(histogram):
   pyplot.Figure()
-  pyplot.plot(np.arange(0,len(histogram)), histogram, 'bo-')
+  pyplot.loglog(np.arange(0,len(histogram)), histogram, 'b.')
   #pyplot.legend(("Random Network Failure","Random Network Attack"),loc="best")
-  pyplot.title('Predicted Question Ranking vs Hit Rate ')
-  pyplot.xlabel("Question's rank in users's likelihood of answering")
-  pyplot.ylabel("Number of users who answered question at this rank")
+  pyplot.title('Ranks Of Questions That Users Answer')
+  pyplot.xlabel("Question's rank on personalized recommendation list for user")
+  pyplot.ylabel("Number of questions")
   pyplot.show(block=True)
 
 plotHistogram(hitHistogram)
