@@ -28,6 +28,7 @@ DB_NAME="superuser.sqlite3"
 con = sql.connect(DB_NAME)
 
 # Load features as dataframes
+usersToQuestionsFileName='usersToQuestions.npz'
 
 # Convert CreationDate column from string into unix epoch timestamp
 # (integer seconds since 1970)
@@ -234,17 +235,18 @@ usersToQuestions = usersToTags * questionsToTags.T
 # arrays with numpy.save or numpy.savez, load them back with numpy.load, and
 # then recreate the sparse matrix object with:
 #  new_csr = csr_matrix((data, indices, indptr), shape=(M, N))
-def saveCSRMatrix(matrix):
-  # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
-  np.savez('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
-  # Compressed: slower save, but uses less disk space (~1GB)
-  #np.savez_compressed('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
+def saveCSRMatrix(matrix, compressed=True):
+  if compressed:
+    # Compressed: slower save, but uses less disk space (~1GB)
+    np.savez_compressed(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
+  else:
+    # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
+    np.savez(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
 
 def loadCSRMatrix(fileName):
-  npzArchive = np.load('usersToQuestions.npz')
+  npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
   
-
 saveCSRMatrix(usersToQuestions)
 
 

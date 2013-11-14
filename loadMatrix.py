@@ -20,7 +20,7 @@ import sanetime
 
 import itertools
 
-usersToQuestionFileName='usersToQuestions.npz'
+usersToQuestionsFileName='usersToQuestions.npz'
 
 # Load sparse usersToQuestions matrix from disk
 # A csr_matrix has 3 data attributes that matter:
@@ -58,7 +58,7 @@ def loadCSRMatrix(fileName):
 
 # Sparse matrix representation: each row is a user, columns are tags
 # elements are the number of times user used that tag
-usersToQuestions = loadCSRMatrix(usersToQuestionFileName)
+usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 
 # Some examples:
 # Verify that rows sum to 1
