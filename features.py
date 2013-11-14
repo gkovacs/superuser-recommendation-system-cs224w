@@ -16,6 +16,8 @@ from scipy import sparse
 #from sklearn.preprocessing import normalize
 #import bottleneck
 
+import matplotlib.pyplot as pyplot
+
 import sqlite3 as sql
 import sanetime
 
@@ -53,7 +55,7 @@ print 'Loading Questions Dataframe'
 # - FavoriteCount (int64) - number of users who have selected this as a favorite question?
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
-questions = loadDataframe("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1")
+questions = loadDataframe("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1 and Id in (Select ParentId from Posts where PostTypeId=2)")
 
 
 # Tags is DataFrame containing:
@@ -88,13 +90,13 @@ del tagCounts['Tags']
 # tagPriors captures probability that a tag appears in a question
 # Computed as (num questions with this tag)/(total num questions)
 totalNumQuestions=len(questions)
-tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'], dtype='float64')
+tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'], dtype='float32')
 
 tagPriors = tagPriors/totalNumQuestions
 tagPriors['Index'] = np.arange(0, len(tagPriors))
 
 # Array of tag index to probability tag appears in question which can be used in computations
-tagPriorsArray = tagPriors['Probability'].values[0]
+#tagPriorsArray = tagPriors['Probability'].values[0]
 
 # Dictionary which maps from tag to its index (for building sparse matrices)
 tagToIndex=dict(row for row in tagPriors['Index'].iteritems())
@@ -139,7 +141,7 @@ def getQuestionsToTags():
     questionIndex+=1
 
   indexes = np.array((questionIndexes, keywordIndexes))
-  return sparse.csr_matrix((keywordProbabilities, indexes), dtype='float64', shape=(len(questions), len(tagPriors)))
+  return sparse.csr_matrix((keywordProbabilities, indexes), dtype='float32', shape=(len(questions), len(tagPriors)))
 
 questionsToTags = getQuestionsToTags()
 
@@ -192,14 +194,26 @@ def getUserToTagsMatrix(usersToTagsMultidimensional):
   
   # Build sparse matrix
   indexes = np.array((userIndexes, tagIndexes))
-  return sparse.csr_matrix((tagWeights, indexes), dtype='float64', shape=(len(users), len(tagPriors)))
+  return sparse.csr_matrix((tagWeights, indexes), dtype='float32', shape=(len(users), len(tagPriors)))
 
-usersToTags = getUserToTagsMatrix(usersToTagsMultidimensional)
 
 # Normalize usersToTags sparse matrix so rows sum to 1
-rowSums = np.array(usersToTags.sum(axis=1))[:,0]
-rowIndices, colIndices = usersToTags.nonzero()
-usersToTags.data /= rowSums[rowIndices]
+def getUsersToTagsSparse(usersToTagsMultidimensional):
+  usersToTags = getUserToTagsMatrix(usersToTagsMultidimensional)
+  rowSums = np.array(usersToTags.sum(axis=1))[:,0]
+  rowIndices, colIndices = usersToTags.nonzero()
+  usersToTags.data /= rowSums[rowIndices]
+  del rowIndices
+  del colIndices
+  del rowSums
+  return usersToTags
+
+usersToTags = getUsersToTagsSparse(usersToTagsMultidimensional)
+del usersToTagsMultidimensional
+del tagToIndex
+
+del tags
+del tagCounts
 
 # Verify that rows sum to 1
 #np.sum(usersToTags[0].todense())
@@ -209,11 +223,8 @@ usersToTags.data /= rowSums[rowIndices]
 
 # Create giant matrix of users' affinity to questions...
 # this results in MemoryError...
-#usersToQuestions = usersToTags * questionsToTags.T
+usersToQuestions = usersToTags * questionsToTags.T
 
-# Multiplying full usersToTags matrix with questionsToTags matrix is too big;
-# so only include top 10,000 users 
-#usersToQuestions = usersToTags[0:10000] * questionsToTags.T
 
 # For a given question, which users are most likely to answer it,
 # given the tags in that question?
@@ -262,5 +273,16 @@ def predictQuestionsAnsweredByUser():
     userIndex += 1
   return histogram
 
-hitHistogram = predictQuestionsAnsweredByUser()
+#hitHistogram = predictQuestionsAnsweredByUser()
 #print 'Prediction rate:'+str(numHits/float(numUsers))
+
+def plotHistogram(histogram):
+  pyplot.Figure()
+  pyplot.plot(np.arange(0,len(histogram)), histogram, 'bo-')
+  #pyplot.legend(("Random Network Failure","Random Network Attack"),loc="best")
+  #pyplot.title(metric.func_name+' with X=|N|/'+str(x)+', Y='+str(y))
+  #pyplot.xlabel('Fraction of nodes deleted')
+  #pyplot.ylabel(metric.func_name)
+  pyplot.show(block=True)
+
+#plotHistogram(hitHistogram)
