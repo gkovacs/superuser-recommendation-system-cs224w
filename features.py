@@ -225,7 +225,7 @@ del tagCounts
 
 # Create giant matrix of users' affinity to questions...
 # this results in MemoryError...
-usersToQuestions = usersToTags * questionsToTags.T
+#usersToQuestions = usersToTags * questionsToTags.T
 
 # Save sparse usersToQuestions matrix to disk
 # A csr_matrix has 3 data attributes that matter:
@@ -278,6 +278,10 @@ def loadCSRMatrix(fileName):
 # For a given user, which questions is he most likely to answer?
 print 'Predicting questions most likely answered by user'
 
+
+# Build hashmap of questionId, answererId combinations
+questionsOwnersSet=set(zip(answers.QuestionId,answers.OwnerId))
+
 #@profile
 def predictQuestionsAnsweredByUser():
   numTop=1000
@@ -291,9 +295,9 @@ def predictQuestionsAnsweredByUser():
     userId = users['Id'].iloc[0]
     for rankIndex in range(numTop):
       questionId = topQuestions['QuestionId'].iloc[rankIndex]
-      relevantAnswers = answers[(answers['QuestionId']==questionId) & (answers['OwnerId']==userId)]
-      if len(relevantAnswers) > 0:
+      if (questionId, userId) in questionsOwnersSet:
         histogram[userIndex,rankIndex] += 1
+        break
     if userIndex % 1000 == 0:
       print userIndex
     userIndex += 1
