@@ -14,6 +14,7 @@ import pandas.io.sql as pd_sql
 import numpy as np
 from scipy import sparse
 #from sklearn.preprocessing import normalize
+#import bottleneck
 
 import sqlite3 as sql
 import sanetime
@@ -34,11 +35,12 @@ def loadDataframe(queryString):
   return dataframe
 
 print 'Loading Users Dataframe'
+numUsers=10000
 # Users = contributors to stackoverflow
 # - Id 
 # - Reputation (int64) = total points received for participating in the community
 # - CreatedDate (datetime) = date when the user joined superuser.com
-users = loadDataframe("Select Id, Reputation, CreationDate From Users")
+users = loadDataframe("Select Id, Reputation, CreationDate From Users order by Reputation desc limit "+str(numUsers))
 
 
 print 'Loading Questions Dataframe'
@@ -148,7 +150,7 @@ print 'Loading Answers Dataframe'
 # - ownerid (id) = id of the user who created the answer (-1 for wiki community answer)
 # - creationdate (datetime) = iso timestamp of when answer was created
 # - score (int64) - sum of up/downvotes that this answer has received
-answers = loadDataframe("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2")
+answers = loadDataframe("Select Id, ParentId as QuestionId, OwnerUserId as OwnerId, CreationDate, Score from Posts where PostTypeId=2 and OwnerUserId in (Select Id From Users Order by Reputation desc limit "+str(numUsers)+");")
 
 
 print 'Grouping Tags by User'
@@ -167,18 +169,18 @@ def mergeAnswersTags(answersDataframe, tagsDataframe):
 
 # Denormalized representation via multidimensional matrix;
 # each row contains: answerer userId, tag, count.
-userToTagsMultidimensional=mergeAnswersTags(answers, tags)
+usersToTagsMultidimensional=mergeAnswersTags(answers, tags)
 
 # Sparse matrix representation: each row is a user, columns are tags
 # elements are the number of times user used that tag
-def getUserToTagsMatrix(userToTagsMultidimensional):
+def getUserToTagsMatrix(usersToTagsMultidimensional):
   userIndex=0
   previousUserId=1
   tagIndexes = list()
   userIndexes = list()
   tagWeights = list()
-  print 'Building sparse userToTags matrix'
-  for ((userid, tag), count) in userToTagsMultidimensional.iteritems():
+  print 'Building sparse usersToTags matrix'
+  for ((userid, tag), count) in usersToTagsMultidimensional.iteritems():
     if previousUserId != userid:
       # start new row
       userIndex += 1
@@ -191,20 +193,34 @@ def getUserToTagsMatrix(userToTagsMultidimensional):
   indexes = np.array((userIndexes, tagIndexes))
   return sparse.csr_matrix((tagWeights, indexes), dtype='float64', shape=(len(users), len(tagPriors)))
 
-userToTags = getUserToTagsMatrix(userToTagsMultidimensional)
+usersToTags = getUserToTagsMatrix(usersToTagsMultidimensional)
 
-# Normalize userToTags sparse matrix so rows sum to 1
-rowSums = np.array(userToTags.sum(axis=1))[:,0]
-rowIndices, colIndices = userToTags.nonzero()
-userToTags.data /= rowSums[rowIndices]
+# Normalize usersToTags sparse matrix so rows sum to 1
+rowSums = np.array(usersToTags.sum(axis=1))[:,0]
+rowIndices, colIndices = usersToTags.nonzero()
+usersToTags.data /= rowSums[rowIndices]
 
 # Verify that rows sum to 1
-#np.sum(userToTags[0].todense())
+#np.sum(usersToTags[0].todense())
 
-# Example: take dot product of 1st row of userToTags and questionsToTags
-#np.asscalar(userToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
+# Example: take dot product of 1st row of usersToTags and questionsToTags
+#np.asscalar(usersToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
 
 # Create giant matrix of users' affinity to questions...
 # this results in MemoryError...
-#usersToQuestions = userToTags * questionsToTags.T
+#usersToQuestions = usersToTags * questionsToTags.T
 
+# Multiplying full usersToTags matrix with questionsToTags matrix is too big;
+# so only include top 10,000 users 
+#usersToQuestions = usersToTags[0:10000] * questionsToTags.T
+
+# For a given question, which users are most likely to answer it,
+# given the tags in that question?
+print 'Predicting users most likely to answer question'
+numTop=100
+for questionToTags in questionsToTags:
+  relevantUsers = usersToTags*questionToTags.T
+  #topUsers = bottleneck.argpartsort(-relevantUsers.toarray(), numTop, axis=0)
+  topUsers = np.argsort(-relevantUsers.toarray(), axis=0)[0:numTop]
+  # Determine if user from topUsers answered the question
+  
