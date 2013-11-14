@@ -88,7 +88,8 @@ del tagCounts['Tags']
 # tagPriors captures probability that a tag appears in a question
 # Computed as (num questions with this tag)/(total num questions)
 totalNumQuestions=len(questions)
-tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'])
+tagPriors = pd.DataFrame(data=tagCounts['NumQuestions'], columns=['Probability'], dtype='float64')
+
 tagPriors = tagPriors/totalNumQuestions
 tagPriors['Index'] = np.arange(0, len(tagPriors))
 
@@ -244,20 +245,22 @@ print 'Predicting questions most likely answered by user'
 def predictQuestionsAnsweredByUser():
   numTop=100
   userIndex=0
-  numHits=0
+  histogram = np.zeros(numTop, dtype='int32')
   for userToTags in usersToTags:
     relevantQuestions = questionsToTags*userToTags.T
     topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
     topQuestions = questions.iloc[topQuestionIndexes.flatten()]
     # TODO: build histogram
     userId = users['Id'].iloc[0]
-    relevantAnswers = answers[(answers['QuestionId'].isin(topQuestions['QuestionId'])) & (answers['OwnerId']==userId)]
-    if len(relevantAnswers) > 0:
-      numHits += 1
+    for rankIndex in range(numTop):
+      questionId = topQuestions['QuestionId'].iloc[rankIndex]
+      relevantAnswers = answers[(answers['QuestionId']==questionId) & (answers['OwnerId']==userId)]
+      if len(relevantAnswers) > 0:
+        histogram[rankIndex] += 1
     if userIndex % 1000 == 0:
       print userIndex
     userIndex += 1
-  return numHits
+  return histogram
 
-numHits = predictQuestionsAnsweredByUser()
-print 'Prediction rate:'+str(numHits/float(numUsers))
+hitHistogram = predictQuestionsAnsweredByUser()
+#print 'Prediction rate:'+str(numHits/float(numUsers))
