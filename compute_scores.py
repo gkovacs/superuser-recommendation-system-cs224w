@@ -1,4 +1,4 @@
-#finding P(Q,T)
+#computes scores.
 
 from features import *
 
@@ -10,6 +10,24 @@ import numpy as np
 import pylab
 import matplotlib.pyplot as plt
 import matplotlib
+
+import pandas as pd
+import pandas.io.sql as pd_sql
+from scipy import sparse
+
+import itertools
+#from sklearn.preprocessing import normalize
+#import bottleneck
+
+usersToQuestionsFileName='usersToQuestions.npz'
+
+def loadCSRMatrix(fileName):
+  npz = np.load(fileName)
+  return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
+
+print 'loading CSRMatrix'
+
+usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 
 question_dict = dict()
 
@@ -66,21 +84,45 @@ def bucketList(time_delta, num_buckets, normalize):
 
 print 'running bucketList'
 
-#we need these to compute P(Q,T) for other questions
+(prob_interval, time, bucket_s) = bucketList(time_delta, 1000, True)
 
-(counts, time, bucket_s) = bucketList(time_delta, 1000, False)
+print 'populating ranks list'
 
-log_counts = [math.log(count) for count in counts]
+ranks = []
 
-plt.xlabel('Time Since Question Was Asked in Months')
-plt.ylabel('Log Count of Answers')
+for i in answers.index:
+	answer_time = sanetime.time(answers.ix[i][3]).seconds
+	answerer_ID = answers.ix[i][2]
+	true_question_ID = answers.ix[i][1]
+	#get probabilities of questions with (answer_time_sec and answerer_ID)
+	prob_questions = usersToQuestions[users['Id'] == answerer_ID].todense().tolist()
+	prob_questions_smoothed = [prob +1e-7 for prob in prob_questions[0]]
 
-plt.title('Log Count of Answers Recorded After Questions Were Asked')
-plt.plot(time, prob_vec, 'r-')
+	question_scores = []
 
-plt.savefig('prob_dist.png')
+	for j in range(len(prob_questions_smoothed)): #loop through each possible question
+		questionId = questions['QuestionId'].iloc[j] #get questionID
+		question_t = question_dict[questionId] #get question time.
 
+		delta = answer_time - question_t
+		bucket = delta / bucket_s
 
-print prob_vec[0:5]
+		prob_time = prob_interval[bucket]
 
+		question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
 
+	question_scores = sorted(question_scores,reverse=True)
+	print >> sys.stderr, "answer: " + str(answerer_ID) + "is being processed"
+  	for rank,score_and_question in enumerate(question_scores):
+  		(score, question) = score_and_question
+    	if true_question_ID == question:
+      		ranks.append(rank)
+      		break
+
+print ranks
+
+	
+
+	
+
+	
