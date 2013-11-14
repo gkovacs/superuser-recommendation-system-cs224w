@@ -90,7 +90,9 @@ print 'populating ranks list'
 
 ranks = []
 
-for i in answers.index:
+#for i in answers.index:
+for i in range(300):
+	print >> sys.stderr, str(i) + " out of 300"# + str(len(answers.index)) 
 	answer_time = sanetime.time(answers.ix[i][3]).seconds
 	answerer_ID = answers.ix[i][2]
 	true_question_ID = answers.ix[i][1]
@@ -116,8 +118,16 @@ for i in answers.index:
   	for rank,score_and_question in enumerate(question_scores):
   		(score, question) = score_and_question
     	if true_question_ID == question:
+    		print rank
       		ranks.append(rank)
       		break
+
+plt.xlabel('Ranks')
+plt.ylabel('Frequency')
+plt.title('Histogram of Ranks')
+plt.hist(ranks)
+plt.savefig('scores.png')
+
 
 print ranks
 
