@@ -225,6 +225,28 @@ del tagCounts
 # this results in MemoryError...
 usersToQuestions = usersToTags * questionsToTags.T
 
+# Save sparse usersToQuestions matrix to disk
+# A csr_matrix has 3 data attributes that matter:
+# .data
+# .indices
+# .indptr
+# All are simple ndarrays, so numpy.save will work on them. Save the three
+# arrays with numpy.save or numpy.savez, load them back with numpy.load, and
+# then recreate the sparse matrix object with:
+#  new_csr = csr_matrix((data, indices, indptr), shape=(M, N))
+def saveCSRMatrix(matrix):
+  # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
+  np.savez('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
+  # Compressed: slower save, but uses less disk space (~1GB)
+  #np.savez_compressed('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
+
+def loadCSRMatrix(fileName):
+  npzArchive = np.load('usersToQuestions.npz')
+  return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
+  
+
+saveCSRMatrix(usersToQuestions)
+
 
 # For a given question, which users are most likely to answer it,
 # given the tags in that question?
