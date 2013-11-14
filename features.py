@@ -216,25 +216,42 @@ usersToTags.data /= rowSums[rowIndices]
 
 # For a given question, which users are most likely to answer it,
 # given the tags in that question?
-print 'Predicting users most likely to answer question'
-numTop=100
-questionIndex=0
-numHits=0
-for questionToTags in questionsToTags:
-  relevantUsers = usersToTags*questionToTags.T
-  #topUsers = bottleneck.argpartsort(-relevantUsers.toarray(), numTop, axis=0)
-  topUserIndexes = np.argsort(-relevantUsers.toarray(), axis=0)[0:numTop]
-  # Determine if user from topUsers answered the question
-  topUserIds = users['Id'].ix[topUserIndexes.flatten()]
-  questionId=questions['QuestionId'].ix[questionIndex]
-  results = answers[(answers['OwnerId'].isin(topUserIds)) & (answers['QuestionId']==questionId)]
-  if len(results) > 0:
-    numHits+=1
-  if questionIndex % 10000 == 0:
-    print questionIndex
-  questionIndex+=1
 
-print 'Prediction rate:'+str(numHits/float(len(questionsToTags)))
+#print 'Predicting users most likely to answer question'
+#numTop=100
+#questionIndex=0
+#numHits=0
+#for questionToTags in questionsToTags:
+#  relevantUsers = usersToTags*questionToTags.T
+#  #topUsers = bottleneck.argpartsort(-relevantUsers.toarray(), numTop, axis=0)
+#  topUserIndexes = np.argsort(-relevantUsers.toarray(), axis=0)[0:numTop]
+#  # Determine if user from topUsers answered the question
+#  topUserIds = users['Id'].ix[topUserIndexes.flatten()]
+#  questionId=questions['QuestionId'].ix[questionIndex]
+#  results = answers[(answers['OwnerId'].isin(topUserIds)) & (answers['QuestionId']==questionId)]
+#  if len(results) > 0:
+#    numHits+=1
+#  if questionIndex % 10000 == 0:
+#    print questionIndex
+#  questionIndex += 1
+#
+#print 'Prediction rate:'+str(numHits/float(len(questionsToTags)))
 
 # For a given user, which questions is he most likely to answer?
-# build histogram
+numTop=100
+userIndex=0
+numHits=0
+print 'Predicting questions most likely answered by user'
+for userToTags in usersToTags:
+  relevantQuestions = questionsToTags*userToTags.T
+  topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
+  topQuestions = questions.iloc[topQuestionIndexes.flatten()]
+  # TODO: build histogram
+  relevantAnswers = answers[(answers['QuestionId'].isin(topQuestions['QuestionId'])) & (answers['OwnerId']==users['Id'].iloc[0])]
+  if len(relevantAnswers) > 0:
+    numHits += 1
+  if userIndex % 10000 == 0:
+    print userIndex
+  userIndex += 1
+
+print 'Prediction rate:'+str(numHits/float(len(usersToTags)))
