@@ -238,20 +238,26 @@ usersToTags.data /= rowSums[rowIndices]
 #print 'Prediction rate:'+str(numHits/float(len(questionsToTags)))
 
 # For a given user, which questions is he most likely to answer?
-numTop=100
-userIndex=0
-numHits=0
 print 'Predicting questions most likely answered by user'
-for userToTags in usersToTags:
-  relevantQuestions = questionsToTags*userToTags.T
-  topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
-  topQuestions = questions.iloc[topQuestionIndexes.flatten()]
-  # TODO: build histogram
-  relevantAnswers = answers[(answers['QuestionId'].isin(topQuestions['QuestionId'])) & (answers['OwnerId']==users['Id'].iloc[0])]
-  if len(relevantAnswers) > 0:
-    numHits += 1
-  if userIndex % 10000 == 0:
-    print userIndex
-  userIndex += 1
 
-print 'Prediction rate:'+str(numHits/float(len(usersToTags)))
+#@profile
+def predictQuestionsAnsweredByUser():
+  numTop=100
+  userIndex=0
+  numHits=0
+  for userToTags in usersToTags:
+    relevantQuestions = questionsToTags*userToTags.T
+    topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
+    topQuestions = questions.iloc[topQuestionIndexes.flatten()]
+    # TODO: build histogram
+    userId = users['Id'].iloc[0]
+    relevantAnswers = answers[(answers['QuestionId'].isin(topQuestions['QuestionId'])) & (answers['OwnerId']==userId)]
+    if len(relevantAnswers) > 0:
+      numHits += 1
+    if userIndex % 1000 == 0:
+      print userIndex
+    userIndex += 1
+  return numHits
+
+numHits = predictQuestionsAnsweredByUser()
+print 'Prediction rate:'+str(numHits/float(numUsers))
