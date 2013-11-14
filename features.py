@@ -209,6 +209,7 @@ def getUsersToTagsSparse(usersToTagsMultidimensional):
   del rowSums
   return usersToTags
 
+# save dataframes before removing them
 usersToTags = getUsersToTagsSparse(usersToTagsMultidimensional)
 del usersToTagsMultidimensional
 del tagToIndex
@@ -248,7 +249,7 @@ def loadCSRMatrix(fileName):
   npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
   
-saveCSRMatrix(usersToQuestions)
+#saveCSRMatrix(usersToQuestions)
 
 
 # For a given question, which users are most likely to answer it,
@@ -279,9 +280,9 @@ print 'Predicting questions most likely answered by user'
 
 #@profile
 def predictQuestionsAnsweredByUser():
-  numTop=100
+  numTop=1000
   userIndex=0
-  histogram = np.zeros(numTop, dtype='int32')
+  histogram = np.zeros((numUsers, numTop), dtype='int32')
   for userToTags in usersToTags:
     relevantQuestions = questionsToTags*userToTags.T
     topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
@@ -292,22 +293,23 @@ def predictQuestionsAnsweredByUser():
       questionId = topQuestions['QuestionId'].iloc[rankIndex]
       relevantAnswers = answers[(answers['QuestionId']==questionId) & (answers['OwnerId']==userId)]
       if len(relevantAnswers) > 0:
-        histogram[rankIndex] += 1
+        histogram[userIndex,rankIndex] += 1
     if userIndex % 1000 == 0:
       print userIndex
     userIndex += 1
   return histogram
 
-#hitHistogram = predictQuestionsAnsweredByUser()
-#print 'Prediction rate:'+str(numHits/float(numUsers))
+hitHistogram = predictQuestionsAnsweredByUser()
+# DO THIS:
+np.savez('histogram', hitHistogram)
 
 def plotHistogram(histogram):
   pyplot.Figure()
   pyplot.plot(np.arange(0,len(histogram)), histogram, 'bo-')
   #pyplot.legend(("Random Network Failure","Random Network Attack"),loc="best")
-  #pyplot.title(metric.func_name+' with X=|N|/'+str(x)+', Y='+str(y))
-  #pyplot.xlabel('Fraction of nodes deleted')
-  #pyplot.ylabel(metric.func_name)
+  pyplot.title('Predicted Question Ranking vs Hit Rate ')
+  pyplot.xlabel("Question's rank in users's likelihood of answering")
+  pyplot.ylabel("Number of users who answered question at this rank")
   pyplot.show(block=True)
 
-#plotHistogram(hitHistogram)
+plotHistogram(hitHistogram)
