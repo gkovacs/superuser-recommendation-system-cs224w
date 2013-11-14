@@ -1,6 +1,6 @@
 #computes scores.
 
-from features import *
+#from features import *
 
 import sys
 import math
@@ -91,7 +91,7 @@ print 'populating ranks list'
 ranks = []
 
 #for i in answers.index:
-for i in range(300):
+for i in range(100):
 	print >> sys.stderr, str(i) + " out of 300"# + str(len(answers.index)) 
 	answer_time = sanetime.time(answers.ix[i][3]).seconds
 	answerer_ID = answers.ix[i][2]

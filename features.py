@@ -226,7 +226,7 @@ del tagCounts
 
 # Create giant matrix of users' affinity to questions...
 # this results in MemoryError...
-#usersToQuestions = usersToTags * questionsToTags.T
+usersToQuestions = usersToTags * questionsToTags.T
 
 # Save sparse usersToQuestions matrix to disk
 # A csr_matrix has 3 data attributes that matter:
@@ -250,7 +250,7 @@ def loadCSRMatrix(fileName):
   npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
   
-#saveCSRMatrix(usersToQuestions)
+saveCSRMatrix(usersToQuestions)
 
 
 # For a given question, which users are most likely to answer it,
