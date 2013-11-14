@@ -236,6 +236,7 @@ usersToQuestions = usersToTags * questionsToTags.T
 # then recreate the sparse matrix object with:
 #  new_csr = csr_matrix((data, indices, indptr), shape=(M, N))
 def saveCSRMatrix(matrix, compressed=True):
+  print 'Saving CSRMatrix to disk as '+usersToQuestionsFileName
   if compressed:
     # Compressed: slower save, but uses less disk space (~1GB)
     np.savez_compressed(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)

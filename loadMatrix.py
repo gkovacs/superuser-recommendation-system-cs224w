@@ -60,13 +60,42 @@ def loadCSRMatrix(fileName):
 # elements are the number of times user used that tag
 usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 
-# Some examples:
-# Verify that rows sum to 1
-# np.sum(usersToTags[0].todense())
+# == Examples of how to use sparse matrix ==
+# Extract row of question weights for first user
+# <1x159950 sparse matrix of type '<type 'numpy.float32'>'
+#         with 117826 stored elements in Compressed Sparse Row format>
+firstUsersQuestions = usersToQuestions[0]
+# alternatively (yields same result)
+firstUsersQuestions = usersToQuestions.getrow(0)
 
-# Example: take dot product of 1st row of usersToTags and questionsToTags
-#np.asscalar(usersToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
+# Some numpy operations don't work on sparse matrices:
+# np.sum(firstUsersQuestions)
+# TypeError: sum() got an unexpected keyword argument 'dtype'
 
-# Create giant matrix of users' affinity to questions...
-# this results in MemoryError...
+# Solution is to turn sparse back into standard numpy representation:
+np.sum(firstUsersQuestions.todense())
+# 3098.2249
+
+# Take dot product with a numpy array
+randArray = np.random.random((1,firstUsersQuestions.get_shape()[1]))
+
+# Note: this is still 2d array, need to flatten it before taking dot-product
+firstUsersQuestions.toarray()
+# array([[ 0.03466362,  0.00956631,  0.00215471, ...,  0.        ,
+#          0.05791005,  0.00721551]], dtype=float32)
+
+dotProduct = randArray.dot(firstUsersQuestions.toarray().flatten())
+# array([ 1551.9086999])
+
+# Get scalar value
+np.asscalar(dotProduct)
+# 1551.9086999040062
+
+# Taking product with standard matrix results in numpy ndarray
+first10Users = usersToQuestions[0:10]
+randMatrix = np.random.random((10,20))
+first10Users.T * randMatrix
+# array([[  1.61087655e-01,   3.97569779e-01,   1.95525542e-01, ...,
+#          2.89768151e-01,   2.21653794e-01,   3.91842512e-01],
+#       [  3.77619517e-01,   5.17023914e-01,   3.05687195e-01, ...,
 
