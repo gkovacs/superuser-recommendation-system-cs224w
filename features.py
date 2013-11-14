@@ -28,6 +28,7 @@ DB_NAME="superuser.sqlite3"
 con = sql.connect(DB_NAME)
 
 # Load features as dataframes
+usersToQuestionsFileName='usersToQuestions.npz'
 
 # Convert CreationDate column from string into unix epoch timestamp
 # (integer seconds since 1970)
@@ -56,6 +57,7 @@ print 'Loading Questions Dataframe'
 # - Title (string) - only seems to be available for questions
 # - Tags (series of string) - list/series of tag strings
 questions = loadDataframe("Select Id as QuestionId, AcceptedAnswerId as AnswerId, OwnerUserId as OwnerId, CreationDate, Score, FavoriteCount, Title, Tags from Posts where PostTypeId=1 and Id in (Select ParentId from Posts where PostTypeId=2)")
+numQuestions = len(questions)
 
 
 # Tags is DataFrame containing:
@@ -208,6 +210,7 @@ def getUsersToTagsSparse(usersToTagsMultidimensional):
   del rowSums
   return usersToTags
 
+# save dataframes before removing them
 usersToTags = getUsersToTagsSparse(usersToTagsMultidimensional)
 del usersToTagsMultidimensional
 del tagToIndex
@@ -223,7 +226,7 @@ del tagCounts
 
 # Create giant matrix of users' affinity to questions...
 # this results in MemoryError...
-usersToQuestions = usersToTags * questionsToTags.T
+#usersToQuestions = usersToTags * questionsToTags.T
 
 # Save sparse usersToQuestions matrix to disk
 # A csr_matrix has 3 data attributes that matter:
@@ -234,18 +237,20 @@ usersToQuestions = usersToTags * questionsToTags.T
 # arrays with numpy.save or numpy.savez, load them back with numpy.load, and
 # then recreate the sparse matrix object with:
 #  new_csr = csr_matrix((data, indices, indptr), shape=(M, N))
-def saveCSRMatrix(matrix):
-  # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
-  np.savez('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
-  # Compressed: slower save, but uses less disk space (~1GB)
-  #np.savez_compressed('usersToQuestions', matrix.data, matrix.indices, matrix.indptr)
+def saveCSRMatrix(matrix, compressed=True):
+  print 'Saving CSRMatrix to disk as '+usersToQuestionsFileName
+  if compressed:
+    # Compressed: slower save, but uses less disk space (~1GB)
+    np.savez_compressed(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
+  else:
+    # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
+    np.savez(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
 
 def loadCSRMatrix(fileName):
-  npzArchive = np.load('usersToQuestions.npz')
+  npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
   
-
-saveCSRMatrix(usersToQuestions)
+#saveCSRMatrix(usersToQuestions)
 
 
 # For a given question, which users are most likely to answer it,
@@ -274,37 +279,41 @@ saveCSRMatrix(usersToQuestions)
 # For a given user, which questions is he most likely to answer?
 print 'Predicting questions most likely answered by user'
 
+
+# Build hashmap of questionId, answererId combinations
+questionsOwnersSet=set(zip(answers.QuestionId,answers.OwnerId))
+
 #@profile
 def predictQuestionsAnsweredByUser():
-  numTop=100
   userIndex=0
-  histogram = np.zeros(numTop, dtype='int32')
+  histogram = np.zeros(numQuestions, dtype='int32')
   for userToTags in usersToTags:
     relevantQuestions = questionsToTags*userToTags.T
-    topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)[0:numTop]
+    topQuestionIndexes = np.argsort(-relevantQuestions.toarray(), axis=0)
     topQuestions = questions.iloc[topQuestionIndexes.flatten()]
-    # TODO: build histogram
     userId = users['Id'].iloc[0]
-    for rankIndex in range(numTop):
-      questionId = topQuestions['QuestionId'].iloc[rankIndex]
-      relevantAnswers = answers[(answers['QuestionId']==questionId) & (answers['OwnerId']==userId)]
-      if len(relevantAnswers) > 0:
+    rankIndex = 0
+    for questionId in topQuestions['QuestionId']:
+      if (questionId, userId) in questionsOwnersSet:
         histogram[rankIndex] += 1
+        break
+      rankIndex += 1
     if userIndex % 1000 == 0:
       print userIndex
     userIndex += 1
   return histogram
 
-#hitHistogram = predictQuestionsAnsweredByUser()
-#print 'Prediction rate:'+str(numHits/float(numUsers))
+hitHistogram = predictQuestionsAnsweredByUser()
+# DO THIS:
+np.savez('histogram', hitHistogram)
 
 def plotHistogram(histogram):
   pyplot.Figure()
-  pyplot.plot(np.arange(0,len(histogram)), histogram, 'bo-')
+  pyplot.loglog(np.arange(0,len(histogram)), histogram, 'b.')
   #pyplot.legend(("Random Network Failure","Random Network Attack"),loc="best")
-  #pyplot.title(metric.func_name+' with X=|N|/'+str(x)+', Y='+str(y))
-  #pyplot.xlabel('Fraction of nodes deleted')
-  #pyplot.ylabel(metric.func_name)
+  pyplot.title('Ranks Of Questions That Users Answer')
+  pyplot.xlabel("Question's rank on personalized recommendation list for user")
+  pyplot.ylabel("Number of questions")
   pyplot.show(block=True)
 
-#plotHistogram(hitHistogram)
+plotHistogram(hitHistogram)
