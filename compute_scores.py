@@ -123,9 +123,6 @@ for i in range(1):
 	prob_questions = usersToQuestions[users['Id'] == answerer_ID].todense().tolist()
 	prob_questions_smoothed = [prob +1e-7 for prob in prob_questions[0]]
 
-	import pdb
-	pdb.set_trace()c
-
 	question_scores = []
 
 	print 'building question scores'
@@ -142,7 +139,8 @@ for i in range(1):
 		print 'questionId: ' + str(questionId)
 		print 'prob_questions_smoothed[j]: ' + str(prob_questions_smoothed[j])
 		print 'prob_time: ' + str(prob_time)
-
+		import pdb
+		pdb.set_trace()
 		question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
 
 	import pdb
@@ -155,10 +153,10 @@ for i in range(1):
   		print score_and_question
   		(score, question) = score_and_question
   		print 'rank: ' +str(rank) + ' score: ' + str(score) + ' question: ' + str(question)
-    	if true_question_ID == question:
-    		print rank
-      		ranks.append(rank)
-      		break
+		if true_question_ID == question:
+    			print rank
+      			ranks.append(rank)
+      			break
 
 plt.xlabel('Ranks')
 plt.ylabel('Frequency')
