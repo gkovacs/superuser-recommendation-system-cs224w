@@ -48,25 +48,27 @@ print 'loading CSRMatrix'
 
 usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 
-question_dict = dict()
+def isoDateToUnixSeconds(isoDate):
+  return sanetime.time(isoDate).seconds
 
-print 'building question_dict'
+def getQuestionDictAndTimeDeltas():
+  print 'building question_dict'
+  #add (questionID, time) pair to dictionary for O(1) lookup. 
+  questionIdDate = questions[['QuestionId','CreationDate']]
+  questionIdDate['QuestionCreationDate'] = questionIdDate['CreationDate'].apply(isoDateToUnixSeconds)
+  questionIdToTimeDict = dict(zip(questionIdDate.QuestionId, questionIdDate.QuestionCreationDate))
 
-for (questionIndex, questionId) in questionIndexToId.iteritems():
-	time_in_sec = sanetime.time(questions.ix[questionIndex]['CreationDate']).seconds
-	question_dict[questionId] = time_in_sec
-	#add (answerID, time) pair to dictionary for O(1) lookup. 
+  print 'building time_delta'
+  #populate the deltas (question answered time - question asked time in seconds.)
+  del questionIdDate['CreationDate']
+  answersTimeDeltas = answers[['QuestionId','CreationDate']].merge(questionIdDate, on="QuestionId")
+  answersTimeDeltas['CreationDate'] = answersTimeDeltas['CreationDate'].apply(isoDateToUnixSeconds)
+  timeDeltas = (answersTimeDeltas['CreationDate']-answersTimeDeltas['QuestionCreationDate']).tolist()
 
-print 'buildling time_delta'
+  return (questionIdToTimeDict, timeDeltas)
 
-#populate the deltas (question answered time - question asked time in seconds.)
-time_delta = []
+question_dict, time_delta = getQuestionDictAndTimeDeltas()
 
-for i in answers.index:
-	question_t = question_dict[answers.ix[i][1]] #time question was asked.
-	answered_t = sanetime.time(answers.ix[i][3]).seconds #time answered.
-	delta = answered_t - question_t
-	time_delta.append(delta)
 
 def bucketList(time_delta, num_buckets, normalize):
 	time_min = 0
@@ -115,22 +117,19 @@ print 'populating ranks list'
 def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
-	for i in range(10): #answers.index:
-		print >> sys.stderr, str(i) + numAnswers 
+	for i in answers.index:
+		if i%10000 == 0:
+			print >> sys.stderr, str(i) + numAnswers
 		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
 		answerer_ID = answers.ix[i]['OwnerId']
 		true_question_ID = answers.ix[i]['QuestionId']
 		
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
-		prob_questions = usersToQuestions[users['Id'] == answerer_ID].todense().tolist()
-		prob_questions_smoothed = [prob +1e-7 for prob in prob_questions[0]]
-	
+		prob_questions_smoothed = usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7
+
 		question_scores = []
 
 		#print 'building question scores'
-                #import ipdb
-                #ipdb.set_trace()
-
 		for j in range(len(prob_questions_smoothed)): #loop through each possible question
 			questionId = questionIndexToId[j] #get questionID
 			question_t = question_dict[questionId] #get question time.
@@ -145,12 +144,11 @@ def getRanks():
 			#print 'prob_time: ' + str(prob_time)
 			question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
 
-
 		question_scores = sorted(question_scores,reverse=True)
-		print >> sys.stderr, "answer: " + str(answerer_ID) + " is being processed"
+		#print >> sys.stderr, "answer: " + str(answerer_ID) + " is being processed"
 
 	  	for rank,score_and_question in enumerate(question_scores):
-  			print score_and_question
+  			#print score_and_question
   			(score, question) = score_and_question
   			print 'rank: ' +str(rank) + ' score: ' + str(score) + ' question: ' + str(question)
 			if true_question_ID == question:
