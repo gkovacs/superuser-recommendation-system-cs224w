@@ -102,6 +102,7 @@ tagPriors['Index'] = np.arange(0, len(tagPriors))
 
 # Dictionary which maps from tag to its index (for building sparse matrices)
 tagToIndex=dict(row for row in tagPriors['Index'].iteritems())
+userToIndex={userId: index for (index, userId) in users['Id'].iteritems()}
 
 
 print 'Grouping Tags by Question'
@@ -179,8 +180,8 @@ usersToTagsMultidimensional=mergeAnswersTags(answers, tags)
 # Sparse matrix representation: each row is a user, columns are tags
 # elements are the number of times user used that tag
 def getUserToTagsMatrix(usersToTagsMultidimensional):
-  userIndex=0
-  previousUserId=1
+  userIndex=-1
+  previousUserId=-1
   tagIndexes = list()
   userIndexes = list()
   tagWeights = list()
@@ -188,7 +189,7 @@ def getUserToTagsMatrix(usersToTagsMultidimensional):
   for ((userid, tag), count) in usersToTagsMultidimensional.iteritems():
     if previousUserId != userid:
       # start new row
-      userIndex += 1
+      userIndex = userToIndex[userid]
       previousUserId=userid
     userIndexes.append(userIndex)
     tagIndexes.append(tagToIndex[tag])
@@ -212,11 +213,13 @@ def getUsersToTagsSparse(usersToTagsMultidimensional):
 
 # save dataframes before removing them
 usersToTags = getUsersToTagsSparse(usersToTagsMultidimensional)
+
 del usersToTagsMultidimensional
 del tagToIndex
 
 del tags
 del tagCounts
+
 
 # Verify that rows sum to 1
 #np.sum(usersToTags[0].todense())
