@@ -38,6 +38,8 @@ users = loadDataframe("Select Id, Reputation, CreationDate From Users order by R
 
 usersToQuestionsFileName='usersToQuestions.npz'
 
+questionIndexToId=dict(questionIndexId for questionIndexId in questions['QuestionId'].iteritems())
+
 def loadCSRMatrix(fileName):
   npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
@@ -50,9 +52,9 @@ question_dict = dict()
 
 print 'building question_dict'
 
-for i in questions.index:
-	time_in_sec = sanetime.time(questions.ix[i]['CreationDate']).seconds
-	question_dict[questions.ix[i]['QuestionId']] = time_in_sec
+for (questionIndex, questionId) in questionIndexToId.iteritems():
+	time_in_sec = sanetime.time(questions.ix[questionIndex]['CreationDate']).seconds
+	question_dict[questionId] = time_in_sec
 	#add (answerID, time) pair to dictionary for O(1) lookup. 
 
 print 'buildling time_delta'
@@ -109,54 +111,55 @@ f.close()
 
 print 'populating ranks list'
 
-ranks = []
-
-#for i in answers.index:
-for i in range(1):
-	#print >> sys.stderr, str(i) + " out of 300"# + str(len(answers.index)) 
-	print >> sys.stderr, str(i) + " out of 10"# + str(len(answers.index)) 
-	answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
-	answerer_ID = answers.ix[i]['OwnerId']
-	true_question_ID = answers.ix[i]['QuestionId']
+#@profile
+def getRanks():
+	ranks = []
+	numAnswers = " out of "+str(len(answers.index))
+	for i in range(10): #answers.index:
+		print >> sys.stderr, str(i) + numAnswers 
+		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
+		answerer_ID = answers.ix[i]['OwnerId']
+		true_question_ID = answers.ix[i]['QuestionId']
+		
+		#get probabilities of questions with (answer_time_sec and answerer_ID)
+		prob_questions = usersToQuestions[users['Id'] == answerer_ID].todense().tolist()
+		prob_questions_smoothed = [prob +1e-7 for prob in prob_questions[0]]
 	
-	#get probabilities of questions with (answer_time_sec and answerer_ID)
-	prob_questions = usersToQuestions[users['Id'] == answerer_ID].todense().tolist()
-	prob_questions_smoothed = [prob +1e-7 for prob in prob_questions[0]]
+		question_scores = []
 
-	question_scores = []
+		#print 'building question scores'
+                #import ipdb
+                #ipdb.set_trace()
 
-	print 'building question scores'
+		for j in range(len(prob_questions_smoothed)): #loop through each possible question
+			questionId = questionIndexToId[j] #get questionID
+			question_t = question_dict[questionId] #get question time.
 
-	for j in range(len(prob_questions_smoothed)): #loop through each possible question
-		questionId = questions['QuestionId'].iloc[j] #get questionID
-		question_t = question_dict[questionId] #get question time.
+			delta = answer_time - question_t
+			bucket = delta / bucket_s
+	
+			prob_time = prob_interval[bucket]
+	
+			#print 'questionId: ' + str(questionId)
+			#print 'prob_questions_smoothed[j]: ' + str(prob_questions_smoothed[j])
+			#print 'prob_time: ' + str(prob_time)
+			question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
 
-		delta = answer_time - question_t
-		bucket = delta / bucket_s
 
-		prob_time = prob_interval[bucket]
+		question_scores = sorted(question_scores,reverse=True)
+		print >> sys.stderr, "answer: " + str(answerer_ID) + " is being processed"
 
-		print 'questionId: ' + str(questionId)
-		print 'prob_questions_smoothed[j]: ' + str(prob_questions_smoothed[j])
-		print 'prob_time: ' + str(prob_time)
-		import pdb
-		pdb.set_trace()
-		question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
+	  	for rank,score_and_question in enumerate(question_scores):
+  			print score_and_question
+  			(score, question) = score_and_question
+  			print 'rank: ' +str(rank) + ' score: ' + str(score) + ' question: ' + str(question)
+			if true_question_ID == question:
+    				print rank
+      				ranks.append(rank)
+      				break
+	return ranks
 
-	import pdb
-	pdb.set_trace()
-
-	question_scores = sorted(question_scores,reverse=True)
-	print >> sys.stderr, "answer: " + str(answerer_ID) + "is being processed"
-
-  	for rank,score_and_question in enumerate(question_scores):
-  		print score_and_question
-  		(score, question) = score_and_question
-  		print 'rank: ' +str(rank) + ' score: ' + str(score) + ' question: ' + str(question)
-		if true_question_ID == question:
-    			print rank
-      			ranks.append(rank)
-      			break
+ranks = getRanks()
 
 plt.xlabel('Ranks')
 plt.ylabel('Frequency')
@@ -167,8 +170,3 @@ plt.savefig('scores_time.png')
 
 print ranks
 
-	
-
-	
-
-	
