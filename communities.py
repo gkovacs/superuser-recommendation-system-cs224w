@@ -65,11 +65,15 @@ def buildGraph():
   #for (userIndex, userId) in itertools.islice(users['Id'].iteritems(), 100):
     if userIndex % 100 == 0:
       print str(userIndex)+' of '+str(numUsers)
+    # Array of only user1's index, for bulk insert of edges
+    user1IndexArray = np.empty((numUsers,1))
+    user1IndexArray.fill(userIndex)
     userSimilarities = usersToTags*usersToTags[userIndex].transpose()
-    dotProductAndIndex = np.append(userSimilarities.toarray(), np.indices(userSimilarities.shape)[0], axis=1)
-    filtered = dotProductAndIndex[dotProductAndIndex[:,0]>0]
-    for (dotProduct, index) in filtered:
-      userGraph.add_edge(userIndex, index, weight=dotProduct)
+    # column1=userIndex1, column2=userIndex2, column3=dotProduct
+    idx1idx2DotProduct = np.column_stack((user1IndexArray, np.indices(userSimilarities.shape)[0] , userSimilarities.toarray()))
+    # only add edges between users whose tag dotproduct > 0
+    filtered = idx1idx2DotProduct[idx1idx2DotProduct[:,2]>0]
+    userGraph.add_weighted_edges_from(filtered)
 
 buildGraph()
 
