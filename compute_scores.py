@@ -51,23 +51,22 @@ usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 def isoDateToUnixSeconds(isoDate):
   return sanetime.time(isoDate).seconds
 
-def getQuestionDictAndTimeDeltas():
+def getQuestionTimeAndTimeDeltas():
   print 'building question_dict'
   #add (questionID, time) pair to dictionary for O(1) lookup. 
   questionIdDate = questions[['QuestionId','CreationDate']]
   questionIdDate['QuestionCreationDate'] = questionIdDate['CreationDate'].apply(isoDateToUnixSeconds)
-  questionIdToTimeDict = dict(zip(questionIdDate.QuestionId, questionIdDate.QuestionCreationDate))
+  del questionIdDate['CreationDate']
 
   print 'building time_delta'
   #populate the deltas (question answered time - question asked time in seconds.)
-  del questionIdDate['CreationDate']
   answersTimeDeltas = answers[['QuestionId','CreationDate']].merge(questionIdDate, on="QuestionId")
   answersTimeDeltas['CreationDate'] = answersTimeDeltas['CreationDate'].apply(isoDateToUnixSeconds)
   timeDeltas = (answersTimeDeltas['CreationDate']-answersTimeDeltas['QuestionCreationDate']).tolist()
 
-  return (questionIdToTimeDict, timeDeltas)
+  return (questionIdDate, timeDeltas)
 
-question_dict, time_delta = getQuestionDictAndTimeDeltas()
+questionIdTime, time_delta = getQuestionTimeAndTimeDeltas()
 
 
 def bucketList(time_delta, num_buckets, normalize):
@@ -113,48 +112,29 @@ f.close()
 
 print 'populating ranks list'
 
-#@profile
+@profile
 def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
-	for i in answers.index:
-		if i%10000 == 0:
+	#for i in answers.index:
+	for i in range(100):
+		if i%100 == 0:
 			print >> sys.stderr, str(i) + numAnswers
 		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
 		answerer_ID = answers.ix[i]['OwnerId']
 		true_question_ID = answers.ix[i]['QuestionId']
 		
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
-		prob_questions_smoothed = usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7
 
 		question_scores = []
 
 		#print 'building question scores'
-		for j in range(len(prob_questions_smoothed)): #loop through each possible question
-			questionId = questionIndexToId[j] #get questionID
-			question_t = question_dict[questionId] #get question time.
-
-			delta = answer_time - question_t
-			bucket = delta / bucket_s
-	
-			prob_time = prob_interval[bucket]
-	
-			#print 'questionId: ' + str(questionId)
-			#print 'prob_questions_smoothed[j]: ' + str(prob_questions_smoothed[j])
-			#print 'prob_time: ' + str(prob_time)
-			question_scores.append((prob_questions_smoothed[j]*prob_time, questionId))
-
-		question_scores = sorted(question_scores,reverse=True)
-		#print >> sys.stderr, "answer: " + str(answerer_ID) + " is being processed"
-
-	  	for rank,score_and_question in enumerate(question_scores):
-  			#print score_and_question
-  			(score, question) = score_and_question
-  			print 'rank: ' +str(rank) + ' score: ' + str(score) + ' question: ' + str(question)
-			if true_question_ID == question:
-    				print rank
-      				ranks.append(rank)
-      				break
+                questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
+                questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
+                questionIdTime['score'] = questionIdTime.apply(lambda row: row['probQuestionsSmoothed']*prob_interval[int(row['bucket'])], axis=1)
+                questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
+                questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
+                ranks.append(int(questionIdSortedByScore.loc[true_question_ID]))
 	return ranks
 
 ranks = getRanks()
