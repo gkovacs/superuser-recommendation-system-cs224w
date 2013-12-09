@@ -120,7 +120,7 @@ def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
 	for i in answers.index:
-	#for i in range(100):
+	#for i in range(1000):
 		if i%100 == 0:
 		    print >> sys.stderr, str(i) + numAnswers
 		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
@@ -130,7 +130,7 @@ def getRanks():
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
 		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
 		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-		questionIdTime['bucket'] = questionIdTime['bucket'].apply(lambda bucket: prob_interval[max(0,min(int(bucket),LAST_BUCKET))])
+		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=0).apply(lambda bucket: prob_interval[int(bucket)])
 		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
 		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
