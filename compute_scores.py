@@ -132,7 +132,7 @@ def getRanks():
 		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
 		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=0, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
 		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
-		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
+		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=[0])['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
 		ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
 	return ranks
