@@ -130,7 +130,7 @@ def getRanks():
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
 		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
 		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=0).apply(lambda bucket: prob_interval[int(bucket)])
+		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=0, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
 		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
 		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
