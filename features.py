@@ -27,9 +27,6 @@ import itertools
 DB_NAME="superuser.sqlite3"
 con = sql.connect(DB_NAME)
 
-# Load features as dataframes
-usersToQuestionsFileName='usersToQuestions.npz'
-
 # Convert CreationDate column from string into unix epoch timestamp
 # (integer seconds since 1970)
 def loadDataframe(queryString):
@@ -214,22 +211,15 @@ def getUsersToTagsSparse(usersToTagsMultidimensional):
 # save dataframes before removing them
 usersToTags = getUsersToTagsSparse(usersToTagsMultidimensional)
 
+#import ipdb
+#ipdb.set_trace()
+
 del usersToTagsMultidimensional
 del tagToIndex
 
 del tags
 del tagCounts
 
-
-# Verify that rows sum to 1
-#np.sum(usersToTags[0].todense())
-
-# Example: take dot product of 1st row of usersToTags and questionsToTags
-#np.asscalar(usersToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
-
-# Create giant matrix of users' affinity to questions...
-# this results in MemoryError...
-usersToQuestions = usersToTags * questionsToTags.T
 
 # Save sparse usersToQuestions matrix to disk
 # A csr_matrix has 3 data attributes that matter:
@@ -240,20 +230,33 @@ usersToQuestions = usersToTags * questionsToTags.T
 # arrays with numpy.save or numpy.savez, load them back with numpy.load, and
 # then recreate the sparse matrix object with:
 #  new_csr = csr_matrix((data, indices, indptr), shape=(M, N))
-def saveCSRMatrix(matrix, compressed=True):
-  print 'Saving CSRMatrix to disk as '+usersToQuestionsFileName
+def saveCSRMatrix(matrix, fileName, compressed=True):
+  print 'Saving CSRMatrix to disk as '+fileName
   if compressed:
     # Compressed: slower save, but uses less disk space (~1GB)
-    np.savez_compressed(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
+    np.savez_compressed(fileName, matrix.data, matrix.indices, matrix.indptr)
   else:
     # Uncompressed: Faster save, but takes up a lot of disk space (3.3GB)
-    np.savez(usersToQuestionsFileName, matrix.data, matrix.indices, matrix.indptr)
+    np.savez(fileName, matrix.data, matrix.indices, matrix.indptr)
 
 def loadCSRMatrix(fileName):
   npz = np.load(fileName)
   return sparse.csr_matrix((npz['arr_0'], npz['arr_1'], npz['arr_2']), dtype='float32')
-  
-saveCSRMatrix(usersToQuestions)
+
+
+saveCSRMatrix(usersToTags, 'usersToTags.npz')
+
+
+# Verify that rows sum to 1
+#np.sum(usersToTags[0].todense())
+
+# Example: take dot product of 1st row of usersToTags and questionsToTags
+#np.asscalar(usersToTags.getrow(0).dot(questionsToTags.getrow(0).T).todense())
+
+# Create giant matrix of users' affinity to questions...
+usersToQuestions = usersToTags * questionsToTags.T
+
+saveCSRMatrix(usersToQuestions, 'usersToQuestions.npz')
 
 
 # For a given question, which users are most likely to answer it,
