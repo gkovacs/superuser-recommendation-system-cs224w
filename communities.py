@@ -20,8 +20,8 @@ from scipy import sparse
 import sqlite3 as sql
 
 from collections import Counter
-
 import itertools
+import pickle
 
 DB_NAME="superuser.sqlite3"
 USERS_TO_TAGS='usersToTags.npz'
@@ -49,9 +49,9 @@ def loadCSRMatrix(fileName):
 print 'loading usersToTags CSRMatrix'
 
 # graph where nodeId is index of user in users dataframe, userId attribute is stackoverflow UserId
-userGraph = nx.Graph()
-for (userIndex, userId) in users['Id'].iteritems():
-  userGraph.add_node(userIndex, userId=userId)
+#userGraph = nx.Graph()
+#for (userIndex, userId) in users['Id'].iteritems():
+#  userGraph.add_node(userIndex, userId=userId)
 
 #userGraph = snap.TUNGraph.New()
 
@@ -61,21 +61,24 @@ usersToTags = loadCSRMatrix(USERS_TO_TAGS)
 
 #@profile
 def buildGraph():
+  adjacencyMatrix = np.zeros((numUsers,numUsers), dtype='float32')
   for (userIndex, userId) in users['Id'].iteritems():
   #for (userIndex, userId) in itertools.islice(users['Id'].iteritems(), 100):
     if userIndex % 100 == 0:
       print str(userIndex)+' of '+str(numUsers)
-    # Array of only user1's index, for bulk insert of edges
-    user1IndexArray = np.empty((numUsers,1))
-    user1IndexArray.fill(userIndex)
+    #if userIndex == 1000:
+    #  from guppy import hpy; heaptest=hpy()
+    #  heaptest.heap()
+    #  import ipdb
+    #  ipdb.set_trace()
     userSimilarities = usersToTags*usersToTags[userIndex].transpose()
-    # column1=userIndex1, column2=userIndex2, column3=dotProduct
-    idx1idx2DotProduct = np.column_stack((user1IndexArray, np.indices(userSimilarities.shape)[0] , userSimilarities.toarray()))
-    # only add edges between users whose tag dotproduct > 0
-    filtered = idx1idx2DotProduct[idx1idx2DotProduct[:,2]>0]
-    userGraph.add_weighted_edges_from(filtered)
+    adjacencyMatrix[userIndex] = userSimilarities.transpose().toarray()
+  return nx.from_numpy_matrix(adjacencyMatrix) 
 
-buildGraph()
+userGraph = buildGraph()
+f = open('userGraph', 'w')
+pickle.dump(userGraph, f)
+f.close()
 
 #@profile
 #def getRanks():
