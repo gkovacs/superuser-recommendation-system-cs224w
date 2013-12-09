@@ -27,6 +27,9 @@ DB_NAME="superuser.sqlite3"
 con = sql.connect(DB_NAME)
 numUsers=10000
 
+NUM_BUCKETS=1000
+LAST_BUCKET=NUM_BUCKETS-1
+
 def loadDataframe(queryString):
   dataframe = pd_sql.read_frame(queryString, con)
   #dataframe['CreationDate'] = dataframe['CreationDate'].apply(lambda t: sanetime.time(t).seconds)
@@ -104,7 +107,7 @@ def bucketList(time_delta, num_buckets, normalize):
 
 print 'running bucketList'
 
-buckList = bucketList(time_delta, 1000, True)
+buckList = bucketList(time_delta, NUM_BUCKETS, True)
 f = open('buckList', 'w')
 pickle.dump(buckList, f)
 f.close()
@@ -112,29 +115,26 @@ f.close()
 
 print 'populating ranks list'
 
-@profile
+#@profile
 def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
-	#for i in answers.index:
-	for i in range(100):
+	for i in answers.index:
+	#for i in range(100):
 		if i%100 == 0:
-			print >> sys.stderr, str(i) + numAnswers
+		    print >> sys.stderr, str(i) + numAnswers
 		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
 		answerer_ID = answers.ix[i]['OwnerId']
 		true_question_ID = answers.ix[i]['QuestionId']
 		
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
-
-		question_scores = []
-
-		#print 'building question scores'
-                questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
-                questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-                questionIdTime['score'] = questionIdTime.apply(lambda row: row['probQuestionsSmoothed']*prob_interval[int(row['bucket'])], axis=1)
-                questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
-                questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
-                ranks.append(int(questionIdSortedByScore.loc[true_question_ID]))
+		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
+		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
+		questionIdTime['bucket'] = questionIdTime['bucket'].apply(lambda bucket: prob_interval[min(int(bucket),LAST_BUCKET)])
+		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
+		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
+		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
+		ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
 	return ranks
 
 ranks = getRanks()
