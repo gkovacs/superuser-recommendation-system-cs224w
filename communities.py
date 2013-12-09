@@ -21,7 +21,7 @@ import sqlite3 as sql
 
 from collections import Counter
 import itertools
-import pickle
+import sPickle
 
 DB_NAME="superuser.sqlite3"
 USERS_TO_TAGS='usersToTags.npz'
@@ -78,11 +78,14 @@ def buildGraph():
     threshold = np.sort(userSimilarities)[-TOPK]
     userSimilarities[userSimilarities<threshold]=0
     adjacencyMatrix[userIndex] = userSimilarities
-  return nx.from_numpy_matrix(adjacencyMatrix) 
+  return nx.from_numpy_matrix(adjacencyMatrix)
 
 userGraph = buildGraph()
+del usersToTags
+del users
+print 'Writing graph to disk'
 f = open('userGraph', 'w')
-pickle.dump(userGraph, f)
+sPickle.s_dump(userGraph, f)
 f.close()
 
 #f = open('userGraph')
