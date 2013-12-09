@@ -130,7 +130,7 @@ def getRanks():
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
 		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
 		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-		questionIdTime['bucket'] = questionIdTime['bucket'].apply(lambda bucket: prob_interval[min(int(bucket),LAST_BUCKET)])
+		questionIdTime['bucket'] = questionIdTime['bucket'].apply(lambda bucket: prob_interval[max(0,min(int(bucket),LAST_BUCKET))])
 		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
 		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
@@ -145,6 +145,8 @@ plt.title('Histogram of Ranks')
 plt.plot(Counter(ranks).keys(),Counter(ranks).values())
 plt.savefig('scores_time.png')
 
+import json
+with open('ranks.txt', 'w') as outfile:
+      json.dump(ranks, outfile)
 
 print ranks
-
