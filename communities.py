@@ -61,24 +61,34 @@ usersToTags = loadCSRMatrix(USERS_TO_TAGS)
 
 #@profile
 def buildGraph():
+  TOPK=1000 # number of edges to keep
   adjacencyMatrix = np.zeros((numUsers,numUsers), dtype='float32')
   for (userIndex, userId) in users['Id'].iteritems():
   #for (userIndex, userId) in itertools.islice(users['Id'].iteritems(), 100):
     if userIndex % 100 == 0:
       print str(userIndex)+' of '+str(numUsers)
-    #if userIndex == 1000:
+    #if userIndex == 10:
     #  from guppy import hpy; heaptest=hpy()
     #  heaptest.heap()
     #  import ipdb
     #  ipdb.set_trace()
     userSimilarities = usersToTags*usersToTags[userIndex].transpose()
-    adjacencyMatrix[userIndex] = userSimilarities.transpose().toarray()
+    userSimilarities = userSimilarities.transpose().toarray()[0]
+    # take top 1000
+    threshold = np.sort(userSimilarities)[-TOPK]
+    userSimilarities[userSimilarities<threshold]=0
+    adjacencyMatrix[userIndex] = userSimilarities
   return nx.from_numpy_matrix(adjacencyMatrix) 
 
 userGraph = buildGraph()
 f = open('userGraph', 'w')
 pickle.dump(userGraph, f)
 f.close()
+
+#f = open('userGraph')
+#userGraph = pickle.load(f)
+#import ipdb
+#ipdb.set_trace()
 
 #@profile
 #def getRanks():
