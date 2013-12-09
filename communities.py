@@ -8,6 +8,7 @@ import sanetime
 
 #import snap as snap
 import networkx as nx
+import community
 
 import numpy as np
 import pylab
@@ -88,8 +89,28 @@ def buildGraph():
 #cPickle.dump(userGraph, f)
 #f.close()
 
+print 'Loading graph from disk'
 f = open('userGraph')
 userGraph = cPickle.load(f)
+#first compute the best partition
+print 'Computing partitions'
+partition = community.best_partition(userGraph)
+
+print 'Drawing partitions'
+#drawing
+size = float(len(set(partition.values())))
+pos = nx.spring_layout(userGraph)
+count = 0.
+for com in set(partition.values()):
+  count = count + 1.
+  list_nodes = [nodes for nodes in partition.keys()
+    if partition[nodes] == com]
+  nx.draw_networkx_nodes(userGraph, pos, list_nodes, node_size = 20,
+    node_color = str(count / size))
+
+nx.draw_networkx_edges(userGraph, pos, alpha=0.5)
+plt.savefig('partitions.png')
+
 import ipdb
 ipdb.set_trace()
 
