@@ -64,8 +64,8 @@ usersToTags = loadCSRMatrix(USERS_TO_TAGS)
 def buildGraph():
   TOPK=1000 # number of edges to keep
   adjacencyMatrix = np.zeros((numUsers,numUsers), dtype='float32')
-  for (userIndex, userId) in users['Id'].iteritems():
-  #for (userIndex, userId) in itertools.islice(users['Id'].iteritems(), 100):
+  #for (userIndex, userId) in users['Id'].iteritems():
+  for (userIndex, userId) in itertools.islice(users['Id'].iteritems(), 1000, 2000):
     if userIndex % 100 == 0:
       print str(userIndex)+' of '+str(numUsers)
     #if userIndex == 10:
@@ -81,38 +81,48 @@ def buildGraph():
     adjacencyMatrix[userIndex] = userSimilarities
   return nx.from_numpy_matrix(adjacencyMatrix)
 
-#userGraph = buildGraph()
-#del usersToTags
-#del users
-#print 'Writing graph to disk'
-#f = open('userGraph', 'w')
-#cPickle.dump(userGraph, f)
-#f.close()
+userGraph = buildGraph()
+del usersToTags
+del users
+print 'Writing graph to disk'
+f = open('userGraph', 'w')
+cPickle.dump(userGraph, f)
+f.close()
 
-print 'Loading graph from disk'
-f = open('userGraph')
-userGraph = cPickle.load(f)
+#print 'Loading graph from disk'
+#f = open('userGraph')
+#userGraph = cPickle.load(f)
 #first compute the best partition
 print 'Computing partitions'
-partition = community.best_partition(userGraph)
+partitions = community.best_partition(userGraph)
+import json
+with open('partitions.txt', 'w') as outfile:
+  json.dump(partitions, outfile)
 
-print 'Drawing partitions'
-#drawing
-size = float(len(set(partition.values())))
-pos = nx.spring_layout(userGraph)
-count = 0.
-for com in set(partition.values()):
-  count = count + 1.
-  list_nodes = [nodes for nodes in partition.keys()
-    if partition[nodes] == com]
-  nx.draw_networkx_nodes(userGraph, pos, list_nodes, node_size = 20,
-    node_color = str(count / size))
-
-nx.draw_networkx_edges(userGraph, pos, alpha=0.5)
-plt.savefig('partitions.png')
-
+partitionsCounter = Counter(partition.values())
 import ipdb
 ipdb.set_trace()
+
+
+def drawPartitions():
+  print 'Drawing partitions'
+  # draw top 5 partitions
+  #blue, green, red, cyan, magenta, yellow
+  colors = ['b', 'g', 'r', 'c', 'm'] #'y'
+  size = float(len(colors)) #float(len(set(partitions.values())))
+  pos = nx.spring_layout(userGraph)
+  partitionsCounter = Counter(partitions.values())
+  relevantPartitions = {partitionKey: partitionValue for (partitionKey, partitionValue)
+    in partitionsCounter.items() if partitionValue > 100}
+  for partitionKey in relevantPartitions.keys():
+    list_nodes = [nodes for nodes in partitions.keys()
+      if partitions[nodes] == partitionKey]
+    nx.draw_networkx_nodes(userGraph, pos, list_nodes, node_size = 20,
+      node_color = colors[partitionKey])
+  
+  nx.draw_networkx_edges(userGraph, pos, alpha=0.5)
+  plt.savefig('partitions.png')
+
 
 #@profile
 #def getRanks():
