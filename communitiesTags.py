@@ -1,23 +1,19 @@
 import matplotlib.pyplot as pyplot
 import json
 import operator
-from collections import Counter
+from collections import Counter, OrderedDict
 
+import numpy as np
 import pandas as pd
 
-partitions=[]
-frequencies=[]
-#frequencies=pd.DataFrame()
+partitions=OrderedDict()
 for partition in range(6):
-  with file('partition'+str(partition)+'.json') as infile:
+  name = 'partition'+str(partition)
+  with file(name+'.json') as infile:
     partitionCounter = Counter(json.load(infile))
-    tags, values = zip(*sorted(partitionCounter.items(), key=operator.itemgetter(0)))
-    frequency = pd.Series(values, index=tags)
-    frequencies.append(frequency/float(sum(frequency)))
-    #frequencies['partition'+str(partition)]=frequency/sum(frequency))
-    partitions.append(partitionCounter)
+    partitions[name]=partitionCounter
 
-allTagCounts = reduce(operator.add, partitions, Counter())
+allTagCounts = reduce(operator.add, partitions.values(), Counter())
 
 # sort alphabetically
 allTags, allValues = zip(*sorted(allTagCounts.items(), key=operator.itemgetter(0)))
@@ -25,9 +21,18 @@ allTagFrequencies = pd.Series(allValues, index=allTags)
 # normalize by number of tags
 allTagFrequencies = allTagFrequencies/float(sum(allTagFrequencies))
 
+
+frequenciesDict=OrderedDict()
+for partition in partitions.keys():
+  tags, values = zip(*sorted(partitions[partition].items(), key=operator.itemgetter(0)))
+  values = np.array(values)
+  values = values/float(np.sum(values))
+  frequenciesDict[partition] = pd.Series(values, index=tags)
+
 import ipdb
 ipdb.set_trace()
-
+frequencies=pd.DataFrame(frequenciesDict)
+del frequenciesDict
 
 tags = tags[0:100]
 values = values[0:100]
