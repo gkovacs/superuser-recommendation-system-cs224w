@@ -74,13 +74,18 @@ def buildGraph():
     adjacencyMatrix[userIndex] = userSimilarities
   return nx.from_numpy_matrix(adjacencyMatrix)
 
-#userGraph = buildGraph()
-#del usersToTags
-#del users
-#print 'Writing graph to disk'
-#f = open('userGraph', 'w')
-#cPickle.dump(userGraph, f)
-#f.close()
+from os.path import exists
+if not exists('userGraph'):
+  userGraph = buildGraph()
+  del usersToTags
+  del users
+  print 'Writing graph to disk'
+  f = open('userGraph', 'w')
+  cPickle.dump(userGraph, f)
+  f.close()
+  print 'generated file userGraph, now exiting, please restart script'
+  from sys import exit
+  exit()
 
 #print 'Loading graph from disk'
 f = open('userGraph')
