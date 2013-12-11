@@ -116,29 +116,58 @@ f.close()
 
 print 'populating ranks list'
 
+runMode = 0
+
+if sys.argv[1] == '1':
+	runMode = 1
+if sys.argv[1] == '2':
+	runMode = 2
+print 'runMode is:', runMode
+
+# 0 = both
+# 1 = topic-model only
+# 2 = quesiton-activity only
+
 #@profile
 def getRanks():
-	ranks = []
+	#ranks = []
+	outfile = open('results-' + str(runMode) + '.txt', 'w')
 	numAnswers = " out of "+str(len(answers.index))
 	for i in answers.index:
 	#for i in range(1000):
 		if i%100 == 0:
 		    print >> sys.stderr, str(i) + numAnswers
+		    outfile.flush()
 		answer_time = isoDateToUnixSeconds(answers.ix[i]['CreationDate'])
 		answerer_ID = answers.ix[i]['OwnerId']
 		true_question_ID = answers.ix[i]['QuestionId']
 		
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
-		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
-		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=-LAST_BUCKET, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
-		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
+		if runMode == 0 or runMode == 1:
+			questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
+		if runMode == 0 or runMode == 2:
+			questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
+			questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=-LAST_BUCKET, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
+		if runMode == 0:
+			questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
+		if runMode == 1:
+			questionIdTime['score'] = questionIdTime['probQuestionsSmoothed']
+		if runMode == 2:
+			questionIdTime['score'] = questionIdTime['bucket']
 		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
- 		ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
-	return ranks
+ 		print >> outfile, str(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
+ 		#ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
+	#return ranks
+	outfile.flush()
+	outfile.close()
 
-ranks = getRanks()
+getRanks()
+
+from sys import exit
+exit()
+
+#ranks = getRanks()
 
 plt.xlabel('Ranks')
 plt.ylabel('Frequency')
