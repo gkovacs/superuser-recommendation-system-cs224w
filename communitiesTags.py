@@ -29,15 +29,18 @@ for partition in partitions.keys():
   values = values/float(np.sum(values))
   frequenciesDict[partition] = pd.Series(values, index=tags)
 
-import ipdb
-ipdb.set_trace()
 frequencies=pd.DataFrame(frequenciesDict)
 del frequenciesDict
 
-tags = tags[0:100]
-values = values[0:100]
+# find tags which are not present in a partition:
+#frequencies['partition0'].index[frequencies['partition0'].apply(np.isnan)]
+# fill missing values with 0
+frequencies = frequencies.fillna(value=0)
 
-#pyplot.bar(range(len(values)), values, align='center')
-pyplot.bar(range(len(values)), values)
-pyplot.xticks(range(len(values)), tags, rotation=90)
-pyplot.show()
+frequenciesDiff = frequencies.sub(allTagFrequencies, axis=0)
+
+for partition in partitions.keys():
+  relativeFrequencies = dict(frequenciesDiff.sort([partition], ascending=0)[partition].iteritems())
+  with open(partition+'-freqs.json', 'w') as outfile:
+    json.dump(relativeFrequencies, outfile)
+
