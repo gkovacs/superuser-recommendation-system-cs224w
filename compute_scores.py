@@ -120,8 +120,8 @@ print 'populating ranks list'
 def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
-	#for i in answers.index:
-	for i in range(1000):
+	for i in answers.index:
+	#for i in range(1000):
 		if i%100 == 0:
 		    print >> sys.stderr, str(i) + numAnswers
 		answer_time = isoDateToUnixSeconds(answers.ix[i]['CreationDate'])

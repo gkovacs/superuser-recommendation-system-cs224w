@@ -75,6 +75,7 @@ def buildGraph():
   return nx.from_numpy_matrix(adjacencyMatrix)
 
 from os.path import exists
+from sys import exit
 if not exists('userGraph'):
   userGraph = buildGraph()
   del usersToTags
@@ -84,18 +85,21 @@ if not exists('userGraph'):
   cPickle.dump(userGraph, f)
   f.close()
   print 'generated file userGraph, now exiting, please restart script'
-  from sys import exit
   exit()
 
 #print 'Loading graph from disk'
 f = open('userGraph')
 userGraph = cPickle.load(f)
-##first compute the best partition
-#print 'Computing partitions'
-#partitions = community.best_partition(userGraph)
 
-#with open('partitions.txt', 'w') as outfile:
-#  json.dump(partitions, outfile)
+if not exists('partitions.txt'):
+  #first compute the best partition
+  print 'Computing partitions'
+  partitions = community.best_partition(userGraph)
+
+  with open('partitions.txt', 'w') as outfile:
+    json.dump(partitions, outfile)
+  print 'generated file partitions.txt, now exiting, please restart script'
+  exit()
 
 with open('partitions.txt') as infile:
   partitions = json.load(infile)
