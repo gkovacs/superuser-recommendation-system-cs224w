@@ -39,8 +39,21 @@ frequencies = frequencies.fillna(value=0)
 
 frequenciesDiff = frequencies.sub(allTagFrequencies, axis=0)
 
+topK=20
 for partition in partitions.keys():
-  relativeFrequencies = dict(frequenciesDiff.sort([partition], ascending=0)[partition].iteritems())
-  with open(partition+'-freqs.json', 'w') as outfile:
-    json.dump(relativeFrequencies, outfile)
+  sortedFreqs = frequenciesDiff.sort([partition], ascending=0)[partition]
+  relativeFrequencies = dict(sortedFreqs.iteritems())
+  topBottom=sortedFreqs.take(np.concatenate((np.arange(0,topK),np.arange(-topK,0))))
+  pyplot.figure()
+  pyplot.title(partition+' most and least used tags')
+  pyplot.subplots_adjust(bottom=0.3, left=0.08, right=0.92)
+  topBottom.plot(kind='bar', color=[(0,0.7,0) if val >=0 else (1,0,0) for val in topBottom])
+  pyplot.savefig(partition+'-tags.png')
+
+  #pyplot.bar(range(len(values)), values)
+  #pyplot.xticks(range(len(values)), tags, rotation=90)
+  #pyplot.show()
+
+  #with open(partition+'-freqs.json', 'w') as outfile:
+  #  json.dump(relativeFrequencies, outfile)
 
