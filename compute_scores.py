@@ -4,7 +4,8 @@
 
 import sys
 import math
-import sanetime
+from datetime import datetime
+import calendar
 
 import numpy as np
 import pylab
@@ -52,7 +53,7 @@ print 'loading CSRMatrix'
 usersToQuestions = loadCSRMatrix(usersToQuestionsFileName)
 
 def isoDateToUnixSeconds(isoDate):
-  return sanetime.time(isoDate).seconds
+  return calendar.timegm(datetime.strptime(isoDate, "%Y-%m-%dT%H:%M:%S.%f").timetuple())
 
 def getQuestionTimeAndTimeDeltas():
   print 'building question_dict'
@@ -119,22 +120,22 @@ print 'populating ranks list'
 def getRanks():
 	ranks = []
 	numAnswers = " out of "+str(len(answers.index))
-	for i in answers.index:
-	#for i in range(1000):
+	#for i in answers.index:
+	for i in range(1000):
 		if i%100 == 0:
 		    print >> sys.stderr, str(i) + numAnswers
-		answer_time = sanetime.time(answers.ix[i]['CreationDate']).seconds
+		answer_time = isoDateToUnixSeconds(answers.ix[i]['CreationDate'])
 		answerer_ID = answers.ix[i]['OwnerId']
 		true_question_ID = answers.ix[i]['QuestionId']
 		
 		#get probabilities of questions with (answer_time_sec and answerer_ID)
 		questionIdTime['probQuestionsSmoothed'] = (usersToQuestions[users['Id'] == answerer_ID].toarray()[0] + 1e-7)
 		questionIdTime['bucket'] = (answer_time-questionIdTime['QuestionCreationDate'])/bucket_s
-		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=0, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
+		questionIdTime['bucket'] = questionIdTime['bucket'].clip(lower=-LAST_BUCKET, upper=LAST_BUCKET).apply(lambda bucket: prob_interval[int(bucket)])
 		questionIdTime['score'] = questionIdTime['bucket']*questionIdTime['probQuestionsSmoothed']
-		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=[0])['QuestionId']
+		questionIdSortedByScore = questionIdTime.sort(['score'], ascending=0)['QuestionId']
 		questionIdSortedByScore = questionIdSortedByScore.reset_index(drop=True)
-		ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
+ 		ranks.append(int(questionIdSortedByScore[questionIdSortedByScore==true_question_ID].index[0]))
 	return ranks
 
 ranks = getRanks()
